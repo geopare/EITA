@@ -106,7 +106,7 @@ if st.session_state["pagina_atual"] == "Início":
                 # Exibe a imagem se ela existir na pasta
                 with col_img:
                     caminho_img = p.get("imagem")
-                    if caminho_img and os.path.exists(caminho_img):
+                    if caminho_img and isinstance(caminho_img, str) and os.path.exists(caminho_img):
                         st.image(caminho_img, width=120)
                     else:
                         st.info("Sem foto")
@@ -130,9 +130,8 @@ if st.session_state["pagina_atual"] == "Início":
                         st.rerun()
                 with col_B:
                     if st.button("🗑️ Excluir", key=f"del_{i}"):
-                        # Opcional: apagar o arquivo de imagem do disco se quiser limpar
                         img_path = p.get("imagem")
-                        if img_path and os.path.exists(img_path):
+                        if img_path and isinstance(img_path, str) and os.path.exists(img_path):
                             try:
                                 os.remove(img_path)
                             except:
@@ -196,12 +195,13 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
     st.markdown("---")
     foto_produto = st.file_uploader("📸 Tirar foto ou carregar imagem do produto", type=["jpg", "jpeg", "png"])
     
-    # Se já houver imagem cadastrada ao editar, mostra uma pré-visualização dela
-    if is_editing and prod_edit.get("imagem") and os.path.exists(prod_edit.get("imagem")):
+    # Pré-visualização da imagem atual caso esteja a editar
+    img_atual = prod_edit.get("imagem")
+    if is_editing and img_atual and isinstance(img_atual, str) and os.path.exists(img_atual):
         st.write("Imagem atual:")
-        st.image(prod_edit.get("imagem"), width=150)
+        st.image(img_atual, width=150)
 
-   st.markdown("")
+    st.markdown("")
     btn_texto = "Salvar Alterações" if is_editing else "Cadastrar Produto"
     
     if st.button(btn_texto, type="primary"):
@@ -216,20 +216,16 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 valor_lucro = preco_producao * (margem_desejada / 100)
                 preco_venda = preco_producao + valor_lucro
                 
-                # Tratamento super seguro para telemóveis e computadores
                 caminho_imagem_salva = prod_edit.get("imagem", None)
                 if foto_produto is not None:
                     try:
-                        # Limpa o nome do arquivo para evitar caracteres especiais do telemóvel
                         nome_limpo = "".join(c for c in foto_produto.name if c.isalnum() or c in ('.', '_', '-'))
                         nome_arquivo = f"{codigo_sugerido.replace('-', '_')}_{nome_limpo}"
                         caminho_imagem_salva = os.path.join(PASTA_IMAGENS, nome_arquivo)
                         
-                        # Salva o arquivo fisicamente
                         with open(caminho_imagem_salva, "wb") as f:
                             f.write(foto_produto.getbuffer())
                     except Exception as img_err:
-                        # Se der erro na foto, continua o cadastro sem bloquear o usuário
                         st.warning(f"Aviso: Não foi possível salvar a imagem ({img_err}), mas o produto será salvo.")
 
                 produto_dados = {

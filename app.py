@@ -3,7 +3,7 @@ import pandas as pd
 import os
 
 # Configuração da página do aplicativo
-st.set_page_config(page_title="Gestão 3D - Alemanha", layout="wide")
+st.set_page_config(page_title="Gestão Eita", layout="wide")
 
 # Nome do arquivo onde os dados serão salvos no seu computador
 ARQUIVO_DADOS = "produtos_3d.csv"
@@ -40,14 +40,14 @@ if "pagina_atual" not in st.session_state:
 
 categorias_lista = [
     "Decoração", 
-    "Peças Técnicas", 
-    "Geek", 
-    "Utilidades", 
-    "Action Figures", 
-    "Prototipagem", 
+    "Laços", 
+    "Utilidades",   
     "Acessórios", 
     "Organização", 
-    "Outros"
+    "Outros",
+    "Natal",
+    "Religiosos",
+    
 ]
 
 # --- BARRA LATERAL: Configurações Globais e Menu Rápido ---
@@ -124,7 +124,8 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
             "categoria": "Decoração",
             "tempo": 0.0,
             "material": 0.0,
-            "margem": 100.0
+            "margem": 100.0,
+            "imagem": None
         }
 
     with st.form("form_cadastro_produto"):
@@ -143,6 +144,10 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
             material_uso = st.number_input("Material Usado (em gramas)", min_value=0.0, step=1.0, value=float(prod_edit.get("material", 0.0)))
             margem_desejada = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, step=10.0, value=float(prod_edit.get("margem", 100.0)))
 
+        # Adicionando a opção de foto (compatível com telemóvel para tirar foto ou carregar da galeria)
+        st.markdown("---")
+        foto_produto = st.file_uploader("📸 Tirar foto ou carregar imagem do produto", type=["jpg", "jpeg", "png"])
+
         btn_texto = "Salvar Alterações" if is_editing else "Cadastrar Produto"
         submitted_form = st.form_submit_button(btn_texto)
         
@@ -157,6 +162,11 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 valor_lucro = preco_producao * (margem_desejada / 100)
                 preco_venda = preco_producao + valor_lucro
                 
+                # Mantém a imagem anterior se estiver a editar e não carregar uma nova
+                imagem_salva = prod_edit.get("imagem", None)
+                if foto_produto is not None:
+                    imagem_salva = foto_produto.name # Ou o processamento adequado para guardar o ficheiro/bytes
+
                 produto_dados = {
                     "codigo": codigo,
                     "nome": nome,
@@ -166,7 +176,8 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                     "producao": preco_producao,
                     "margem": margem_desejada,
                     "venda": preco_venda,
-                    "lucro": valor_lucro
+                    "lucro": valor_lucro,
+                    "imagem": imagem_salva
                 }
                 
                 if is_editing:

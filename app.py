@@ -66,29 +66,48 @@ prefixos_categorias = {
     "Outros": "OUT",
 }
 
-# Barra Lateral
+# ==========================================
+# BARRA LATERAL (MENU E CONFIGURAÇÕES)
+# ==========================================
 with st.sidebar:
-    st.header("⚙️ Configurações")
-    st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (R$/g)", min_value=0.0, value=custo_filamento_g, step=0.01)
-    st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (R$/h)", min_value=0.0, value=custo_hora_maquina, step=0.5)
+    # Se quiser colocar a sua logo na barra lateral, pode usar st.image("sua_logo.png") aqui
+    st.title("🖨️ Menu Principal")
     
-    st.markdown("---")
-    if st.button("➕ Novo Produto"):
+    if st.button("🏠 Início / Produtos", use_container_width=True):
+        st.session_state["pagina_atual"] = "Início"
+        st.session_state["edit_index"] = None
+        st.rerun()
+        
+    if st.button("➕ Cadastrar Novo Produto", use_container_width=True):
         st.session_state["edit_index"] = None
         st.session_state["pagina_atual"] = "Cadastrar"
         st.rerun()
+        
+    if st.button("calculator 📑 Gerar Orçamento", use_container_width=True):
+        st.session_state["pagina_atual"] = "Orcamento"
+        st.rerun()
+
+    st.markdown("---")
+    st.header("⚙️ Custos Base")
+    st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (R$/g)", min_value=0.0, value=custo_filamento_g, step=0.01)
+    st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (R$/h)", min_value=0.0, value=custo_hora_maquina, step=0.5)
 
 # ==========================================
 # PÁGINA 1: INÍCIO (LISTA DE PRODUTOS)
 # ==========================================
 if st.session_state["pagina_atual"] == "Início":
     st.title("🖨️ Gestão de Impressão 3D")
+    st.markdown("Bem-vindo ao seu painel de produção e catálogo de produtos.")
     
-    col_b1, _ = st.columns([1, 4])
+    col_b1, col_b2 = st.columns([1, 3])
     with col_b1:
-        if st.button("➕ Cadastrar Novo Produto", type="primary"):
+        if st.button("➕ Novo Produto", type="primary"):
             st.session_state["edit_index"] = None
             st.session_state["pagina_atual"] = "Cadastrar"
+            st.rerun()
+    with col_b2:
+        if st.button("📑 Ir para Orçamentos"):
+            st.session_state["pagina_atual"] = "Orcamento"
             st.rerun()
             
     st.markdown("---")
@@ -178,7 +197,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
         # SKU Automático
         if not is_editing:
             prefixo_atual = prefixos_categorias.get(categoria, "PRD")
-            produtos_mesma_cat = [p for p in st.session_state["produtos"] if p.get("categoria") == categoria]
+            produtos_mesma_cat = [p for p in st.session_state["produtos"] if p.get("categoria"] == categoria]
             proximo_num = len(produtos_mesma_cat) + 1
             codigo_sugerido = f"{prefixo_atual}-{proximo_num:03d}"
         else:
@@ -195,7 +214,6 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
     st.markdown("---")
     foto_produto = st.file_uploader("📸 Tirar foto ou carregar imagem do produto", type=["jpg", "jpeg", "png"])
     
-    # Pré-visualização da imagem atual caso esteja a editar
     img_atual = prod_edit.get("imagem")
     if is_editing and img_atual and isinstance(img_atual, str) and os.path.exists(img_atual):
         st.write("Imagem atual:")
@@ -261,3 +279,55 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
             st.session_state["edit_index"] = None
             st.session_state["pagina_atual"] = "Início"
             st.rerun()
+
+# ==========================================
+# PÁGINA 3: ORÇAMENTO
+# ==========================================
+elif st.session_state["pagina_atual"] == "Orcamento":
+    if st.button("⬅️ Voltar para o Início"):
+        st.session_state["pagina_atual"] = "Início"
+        st.rerun()
+        
+    st.subheader("📑 Calculadora de Orçamento Rápido")
+    
+    produtos = st.session_state["produtos"]
+    
+    if not produtos:
+        st.warning("Não existem produtos cadastrados para gerar orçamento. Cadastre um produto primeiro.")
+    else:
+        # Seleção do produto a partir dos cadastrados
+        nomes_produtos = [f"{p.get('codigo')} - {p.get('nome')}" for p in produtos]
+        escolha_prod = st.selectbox("Selecione o Produto", nomes_produtos)
+        
+        # Encontra o produto selecionado
+        idx_escolhido = nomes_produtos.index(escolha_prod)
+        prod_selecionado = produtos[idx_escolhido]
+        
+        col_orc1, col_orc2 = st.columns(2)
+        
+        with col_orc1:
+            st.markdown("### Detalhes do Item")
+            st.write(f"**Categoria:** {prod_selecionado.get('categoria')}")
+            st.write(f"**Preço Unitário Base:** R$ {prod_selecionado.get('venda', 0):.2f}")
+            quantidade = st.number_input("Quantidade Desejada", min_value=1, value=1, step=1)
+            
+        with col_orc2:
+            st.markdown("### Condições Especiais")
+            desconto_perc = st.number_input("Desconto Aplicável (%)", min_value=0.0, max_value=100.0, value=0.0, step=5.0)
+            
+        st.markdown("---")
+        
+        # Cálculo do orçamento
+        preco_unit = float(prod_selecionado.get('venda', 0))
+        subtotal = preco_unit * quantidade
+        valor_desconto = subtotal * (desconto_perc / 100)
+        total_final = subtotal - valor_desconto
+        
+        st.markdown(f"### 💰 Resumo do Orçamento")
+        st.write(f"**Subtotal ({quantidade} un.):** R$ {subtotal:.2f}")
+        if desconto_perc > 0:
+            st.write(f"**Desconto ({desconto_perc}%):** - R$ {valor_desconto:.2f}")
+        st.markdown(f"## **Total do Orçamento: R$ {total_final:.2f}**")
+        
+        if st.button("🖨️ Imprimir / Copiar Resumo"):
+            st.success("Orçamento calculado com sucesso! Pronto para enviar ao cliente.")

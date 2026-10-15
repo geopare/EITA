@@ -77,7 +77,7 @@ with st.sidebar:
     
     st.title("🖨️ Menu Principal")
     
-    if st.button("🏠 Início / Painel", use_container_width=True):
+    if st.button("🏠 Início / Produtos", use_container_width=True):
         st.session_state["pagina_atual"] = "Início"
         st.session_state["edit_index"] = None
         st.rerun()
@@ -97,37 +97,37 @@ with st.sidebar:
     st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (R$/h)", min_value=0.0, value=custo_hora_maquina, step=0.5)
 
 # ==========================================
-# PÁGINA 1: INÍCIO (PAINEL PRINCIPAL COM LOGO E BOTÕES)
+# PÁGINA 1: INÍCIO (PAINEL ORGANIZADO)
 # ==========================================
 if st.session_state["pagina_atual"] == "Início":
-    # Exibe a logo principal em destaque no topo da página (se existir)
-    if os.path.exists("logo.png"):
-        st.image("logo.png", width=250)
-    elif os.path.exists("imagens/logo.png"):
-        st.image("imagens/logo.png", width=250)
-
-    st.title("🖨️ Gestão de Produção - Impressão 3D")
-    st.markdown("Bem-vindo ao seu sistema móvel de controlo de custos, catálogo de produtos e orçamentos.")
+    col_logo, col_titulo = st.columns([1, 4])
+    with col_logo:
+        if os.path.exists("logo.png"):
+            st.image("logo.png", width=120)
+        elif os.path.exists("imagens/logo.png"):
+            st.image("imagens/logo.png", width=120)
+    with col_titulo:
+        st.title("🖨️ Gestão de Impressão 3D")
+        st.markdown("Painel de produção, catálogo e orçamentos.")
     
-    st.markdown("### Acesso Rápido")
-    col_bt1, col_bt2 = st.columns(2)
-    with col_bt1:
-        if st.button("➕ Cadastrar Novo Produto", type="primary", use_container_width=True):
+    col_b1, col_b2, _ = st.columns([1, 1, 2])
+    with col_b1:
+        if st.button("➕ Novo Produto", type="primary", use_container_width=True):
             st.session_state["edit_index"] = None
             st.session_state["pagina_atual"] = "Cadastrar"
             st.rerun()
-    with col_bt2:
-        if st.button("📑 Ir para Orçamentos", use_container_width=True):
+    with col_b2:
+        if st.button("📑 Orçamentos", use_container_width=True):
             st.session_state["pagina_atual"] = "Orcamento"
             st.rerun()
             
     st.markdown("---")
-    st.subheader("📦 Catálogo de Produtos Cadastrados")
+    st.subheader("📦 Produtos Cadastrados")
     
     produtos = st.session_state["produtos"]
     
     if not produtos:
-        st.info("Ainda não há produtos cadastrados. Clique no botão de cadastro acima para começar!")
+        st.info("Ainda não há produtos cadastrados. Clique em 'Novo Produto' para começar!")
     else:
         for i, p in enumerate(produtos):
             with st.expander(f"{p.get('codigo', 'SKU')} - {p.get('nome', 'Sem nome')} ({p.get('categoria', 'Outros')})"):
@@ -290,50 +290,58 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
             st.rerun()
 
 # ==========================================
-# PÁGINA 3: ORÇAMENTO
+# PÁGINA 3: ORÇAMENTO (MÚLTIPLOS PRODUTOS)
 # ==========================================
 elif st.session_state["pagina_atual"] == "Orcamento":
     if st.button("⬅️ Voltar para o Início"):
         st.session_state["pagina_atual"] = "Início"
         st.rerun()
         
-    st.subheader("📑 Calculadora de Orçamento Rápido")
+    st.subheader("📑 Calculadora de Orçamento (Múltiplos Produtos)")
     
     produtos = st.session_state["produtos"]
     
     if not produtos:
         st.warning("Não existem produtos cadastrados para gerar orçamento. Cadastre um produto primeiro.")
     else:
-        nomes_produtos = [f"{p.get('codigo')} - {p.get('nome')}" for p in produtos]
-        escolha_prod = st.selectbox("Selecione o Produto", nomes_produtos)
+        # Cria um dicionário para mapear SKU/Nome para o objeto do produto
+        opcoes_produtos = {f"{p.get('codigo')} - {p.get('nome')} (R$ {p.get('venda', 0):.2f})": p for p in produtos}
         
-        idx_escolhido = nomes_produtos.index(escolha_prod)
-        prod_selecionado = produtos[idx_escolhido]
+        # Seleção múltipla de produtos
+        produtos_selecionados_nomes = st.multiselect(
+            "Selecione os produtos para o orçamento", 
+            options=list(opcoes_produtos.keys())
+        )
         
-        col_orc1, col_orc2 = st.columns(2)
-        
-        with col_orc1:
-            st.markdown("### Detalhes do Item")
-            st.write(f"**Categoria:** {prod_selecionado.get('categoria')}")
-            st.write(f"**Preço Unitário Base:** R$ {prod_selecionado.get('venda', 0):.2f}")
-            quantidade = st.number_input("Quantidade Desejada", min_value=1, value=1, step=1)
+        if produtos_selecionados_nomes:
+            st.markdown("---")
+            st.markdown("### 🛒 Itens e Quantidades")
             
-        with col_orc2:
-            st.markdown("### Condições Especiais")
-            desconto_perc = st.number_input("Desconto Aplicável (%)", min_value=0.0, max_value=100.0, value=0.0, step=5.0)
+            total_geral = 0.0
             
-        st.markdown("---")
-        
-        preco_unit = float(prod_selecionado.get('venda', 0))
-        subtotal = preco_unit * quantidade
-        valor_desconto = subtotal * (desconto_perc / 100)
-        total_final = subtotal - valor_desconto
-        
-        st.markdown(f"### 💰 Resumo do Orçamento")
-        st.write(f"**Subtotal ({quantidade} un.):** R$ {subtotal:.2f}")
-        if desconto_perc > 0:
-            st.write(f"**Desconto ({desconto_perc}%):** - R$ {valor_desconto:.2f}")
-        st.markdown(f"## **Total do Orçamento: R$ {total_final:.2f}**")
-        
-        if st.button("🖨️ Imprimir / Copiar Resumo"):
-            st.success("Orçamento calculado com sucesso! Pronto para enviar ao cliente.")
+            # Para cada produto selecionado, define quantidade e desconto individual
+            for nome_op in produtos_selecionados_nomes:
+                prod = opcoes_produtos[nome_op]
+                st.markdown(f"**{nome_op}**")
+                
+                col_qtd, col_desc = st.columns(2)
+                with col_qtd:
+                    qtd = st.number_input(f"Quantidade", min_value=1, value=1, step=1, key=f"qtd_{prod.get('codigo')}")
+                with col_desc:
+                    desc = st.number_input(f"Desconto (%)", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key=f"desc_{prod.get('codigo')}")
+                
+                preco_unit = float(prod.get('venda', 0))
+                subtotal_item = preco_unit * qtd
+                valor_desconto_item = subtotal_item * (desc / 100)
+                total_item = subtotal_item - valor_desconto_item
+                
+                total_geral += total_item
+                st.write(f"Subtotal do item: **R$ {total_item:.2f}**")
+                st.markdown("---")
+                
+            st.markdown(f"## 💰 **Valor Total do Orçamento: R$ {total_geral:.2f}**")
+            
+            if st.button("🖨️ Finalizar / Copiar Resumo do Orçamento", type="primary"):
+                st.success("Orçamento global calculado com sucesso! Pronto para enviar ao cliente.")
+        else:
+            st.info("Selecione um ou mais produtos acima para começar a montar o orçamento.")

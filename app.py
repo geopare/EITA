@@ -166,7 +166,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
         margem_desejada = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, step=10.0, value=float(prod_edit.get("margem", 100.0)))
 
     st.markdown("---")
-    foto_produto = st.file_uploader("📸 Tirar foto ou carregar imagem do produto", type=["jpg", "jpeg", "png"])
+    #foto_produto = st.file_uploader("📸 Tirar foto ou carregar imagem do produto", type=["jpg", "jpeg", "png"])
 
     st.markdown("")
     btn_texto = "Salvar Alterações" if is_editing else "Cadastrar Produto"

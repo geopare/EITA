@@ -70,7 +70,6 @@ prefixos_categorias = {
 # BARRA LATERAL (MENU E CONFIGURAÇÕES)
 # ==========================================
 with st.sidebar:
-    # Se quiser colocar a sua logo na barra lateral, pode usar st.image("sua_logo.png") aqui
     st.title("🖨️ Menu Principal")
     
     if st.button("🏠 Início / Produtos", use_container_width=True):
@@ -83,7 +82,7 @@ with st.sidebar:
         st.session_state["pagina_atual"] = "Cadastrar"
         st.rerun()
         
-    if st.button("calculator 📑 Gerar Orçamento", use_container_width=True):
+    if st.button("📑 Gerar Orçamento", use_container_width=True):
         st.session_state["pagina_atual"] = "Orcamento"
         st.rerun()
 
@@ -122,7 +121,6 @@ if st.session_state["pagina_atual"] == "Início":
             with st.expander(f"{p.get('codigo', 'SKU')} - {p.get('nome', 'Sem nome')} ({p.get('categoria', 'Outros')})"):
                 col_img, col_info1, col_info2, col_info3 = st.columns([1.5, 1.5, 1.5, 1.5])
                 
-                # Exibe a imagem se ela existir na pasta
                 with col_img:
                     caminho_img = p.get("imagem")
                     if caminho_img and isinstance(caminho_img, str) and os.path.exists(caminho_img):
@@ -194,10 +192,10 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
         cat_index = categorias_lista.index(cat_atual) if cat_atual in categorias_lista else 0
         categoria = st.selectbox("Categoria", categorias_lista, index=cat_index)
         
-        # SKU Automático
+        # SKU Automático corrigido
         if not is_editing:
             prefixo_atual = prefixos_categorias.get(categoria, "PRD")
-            produtos_mesma_cat = [p for p in st.session_state["produtos"] if p.get("categoria"] == categoria]
+            produtos_mesma_cat = [p for p in st.session_state["produtos"] if p.get("categoria") == categoria]
             proximo_num = len(produtos_mesma_cat) + 1
             codigo_sugerido = f"{prefixo_atual}-{proximo_num:03d}"
         else:
@@ -295,11 +293,9 @@ elif st.session_state["pagina_atual"] == "Orcamento":
     if not produtos:
         st.warning("Não existem produtos cadastrados para gerar orçamento. Cadastre um produto primeiro.")
     else:
-        # Seleção do produto a partir dos cadastrados
         nomes_produtos = [f"{p.get('codigo')} - {p.get('nome')}" for p in produtos]
         escolha_prod = st.selectbox("Selecione o Produto", nomes_produtos)
         
-        # Encontra o produto selecionado
         idx_escolhido = nomes_produtos.index(escolha_prod)
         prod_selecionado = produtos[idx_escolhido]
         
@@ -317,7 +313,6 @@ elif st.session_state["pagina_atual"] == "Orcamento":
             
         st.markdown("---")
         
-        # Cálculo do orçamento
         preco_unit = float(prod_selecionado.get('venda', 0))
         subtotal = preco_unit * quantidade
         valor_desconto = subtotal * (desconto_perc / 100)

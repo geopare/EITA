@@ -40,11 +40,11 @@ if "edit_index" not in st.session_state:
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "Início"
 
-# Custos padrão
+# Custos padrão ajustados para a Alemanha (Filamento a 14€/kg = 0.014€/g, Hora de Máquina/Energia aprox. 1.00€/h)
 if "custo_filamento_g" not in st.session_state:
-    st.session_state["custo_filamento_g"] = 0.10
+    st.session_state["custo_filamento_g"] = 0.014
 if "custo_hora_maquina" not in st.session_state:
-    st.session_state["custo_hora_maquina"] = 5.00
+    st.session_state["custo_hora_maquina"] = 1.00
 
 custo_filamento_g = st.session_state["custo_filamento_g"]
 custo_hora_maquina = st.session_state["custo_hora_maquina"]
@@ -92,9 +92,9 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.header("⚙️ Custos Base")
-    st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (R$/g)", min_value=0.0, value=custo_filamento_g, step=0.01)
-    st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (R$/h)", min_value=0.0, value=custo_hora_maquina, step=0.5)
+    st.header("⚙️ Custos Base (Alemanha)")
+    st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (€/g)", min_value=0.0, value=custo_filamento_g, step=0.001, format="%.3f")
+    st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (€/h)", min_value=0.0, value=custo_hora_maquina, step=0.10, format="%.2f")
 
 # ==========================================
 # PÁGINA 1: INÍCIO (PAINEL ORGANIZADO)
@@ -145,11 +145,11 @@ if st.session_state["pagina_atual"] == "Início":
                     st.write(f"**Tempo:** {p.get('tempo')}h")
                     st.write(f"**Material:** {p.get('material')}g")
                 with col_info2:
-                    st.write(f"**Custo Produção:** R$ {p.get('producao', 0):.2f}")
+                    st.write(f"**Custo Produção:** € {p.get('producao', 0):.2f}")
                     st.write(f"**Margem:** {p.get('margem')}%")
-                    st.write(f"**Lucro:** R$ {p.get('lucro', 0):.2f}")
+                    st.write(f"**Lucro:** € {p.get('lucro', 0):.2f}")
                 with col_info3:
-                    st.markdown(f"### **Venda: R$ {p.get('venda', 0):.2f}**")
+                    st.markdown(f"### **Venda: € {p.get('venda', 0):.2f}**")
                         
                 col_A, col_B = st.columns(2)
                 with col_A:
@@ -304,10 +304,8 @@ elif st.session_state["pagina_atual"] == "Orcamento":
     if not produtos:
         st.warning("Não existem produtos cadastrados para gerar orçamento. Cadastre um produto primeiro.")
     else:
-        # Cria um dicionário para mapear SKU/Nome para o objeto do produto
-        opcoes_produtos = {f"{p.get('codigo')} - {p.get('nome')} (R$ {p.get('venda', 0):.2f})": p for p in produtos}
+        opcoes_produtos = {f"{p.get('codigo')} - {p.get('nome')} (€ {p.get('venda', 0):.2f})": p for p in produtos}
         
-        # Seleção múltipla de produtos
         produtos_selecionados_nomes = st.multiselect(
             "Selecione os produtos para o orçamento", 
             options=list(opcoes_produtos.keys())
@@ -319,7 +317,6 @@ elif st.session_state["pagina_atual"] == "Orcamento":
             
             total_geral = 0.0
             
-            # Para cada produto selecionado, define quantidade e desconto individual
             for nome_op in produtos_selecionados_nomes:
                 prod = opcoes_produtos[nome_op]
                 st.markdown(f"**{nome_op}**")
@@ -336,10 +333,10 @@ elif st.session_state["pagina_atual"] == "Orcamento":
                 total_item = subtotal_item - valor_desconto_item
                 
                 total_geral += total_item
-                st.write(f"Subtotal do item: **R$ {total_item:.2f}**")
+                st.write(f"Subtotal do item: **€ {total_item:.2f}**")
                 st.markdown("---")
                 
-            st.markdown(f"## 💰 **Valor Total do Orçamento: R$ {total_geral:.2f}**")
+            st.markdown(f"## 💰 **Valor Total do Orçamento: € {total_geral:.2f}**")
             
             if st.button("🖨️ Finalizar / Copiar Resumo do Orçamento", type="primary"):
                 st.success("Orçamento global calculado com sucesso! Pronto para enviar ao cliente.")

@@ -171,7 +171,10 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
     st.markdown("")
     btn_texto = "Salvar Alterações" if is_editing else "Cadastrar Produto"
     
+    # Vamos adicionar um teste de clique imediato
     if st.button(btn_texto, type="primary"):
+        st.write("🔥 O botão foi clicado com sucesso!") # Teste para ver se aparece na tela
+        
         if not nome:
             st.error("Por favor, preencha pelo menos o Nome do produto.")
         else:
@@ -206,7 +209,6 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 else:
                     st.session_state["produtos"].append(produto_dados)
                 
-                # Tenta salvar e reporta se houver erro
                 salvar_dados(st.session_state["produtos"])
                 
                 st.success("Produto guardado com sucesso!")
@@ -214,11 +216,6 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 
             except Exception as e:
                 st.error(f"Erro detalhado ao cadastrar: {e}")
-
-    if is_editing:
-        if st.button("❌ Cancelar Edição"):
-            st.session_state["edit_index"] = None
-            st.rerun()
 
 # ==========================================
 # PÁGINA 3: PRODUTOS (CATÁLOGO)

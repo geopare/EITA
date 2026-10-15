@@ -171,45 +171,49 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
     st.markdown("")
     btn_texto = "Salvar Alterações" if is_editing else "Cadastrar Produto"
     
-    # Botão normal fora do formulário (resolve o bloqueio no telemóvel)
     if st.button(btn_texto, type="primary"):
         if not nome:
             st.error("Por favor, preencha pelo menos o Nome do produto.")
         else:
-            custo_material = material_uso * custo_filamento_g
-            custo_tempo = tempo_impressao * custo_hora_maquina
-            preco_producao = custo_material + custo_tempo
-            
-            valor_lucro = preco_producao * (margem_desejada / 100)
-            preco_venda = preco_producao + valor_lucro
-            
-            imagem_salva = prod_edit.get("imagem", None)
-            if foto_produto is not None:
-                imagem_salva = foto_produto.name
+            try:
+                custo_material = material_uso * custo_filamento_g
+                custo_tempo = tempo_impressao * custo_hora_maquina
+                preco_producao = custo_material + custo_tempo
+                
+                valor_lucro = preco_producao * (margem_desejada / 100)
+                preco_venda = preco_producao + valor_lucro
+                
+                imagem_salva = prod_edit.get("imagem", None)
+                if foto_produto is not None:
+                    imagem_salva = foto_produto.name
 
-            produto_dados = {
-                "codigo": codigo_sugerido,
-                "nome": nome,
-                "categoria": categoria,
-                "tempo": tempo_impressao,
-                "material": material_uso,
-                "producao": preco_producao,
-                "margem": margem_desejada,
-                "venda": preco_venda,
-                "lucro": valor_lucro,
-                "imagem": imagem_salva
-            }
-            
-            if is_editing:
-                st.session_state["produtos"][st.session_state["edit_index"]] = produto_dados
-                st.session_state["edit_index"] = None
-                st.success(f"Produto '{nome}' atualizado com sucesso!")
-            else:
-                st.session_state["produtos"].append(produto_dados)
-                st.success(f"Produto '{nome}' cadastrado com sucesso!")
-            
-            salvar_dados(st.session_state["produtos"])
-            st.rerun()
+                produto_dados = {
+                    "codigo": codigo_sugerido,
+                    "nome": nome,
+                    "categoria": categoria,
+                    "tempo": tempo_impressao,
+                    "material": material_uso,
+                    "producao": preco_producao,
+                    "margem": margem_desejada,
+                    "venda": preco_venda,
+                    "lucro": valor_lucro,
+                    "imagem": imagem_salva
+                }
+                
+                if is_editing:
+                    st.session_state["produtos"][st.session_state["edit_index"]] = produto_dados
+                    st.session_state["edit_index"] = None
+                else:
+                    st.session_state["produtos"].append(produto_dados)
+                
+                # Tenta salvar e reporta se houver erro
+                salvar_dados(st.session_state["produtos"])
+                
+                st.success("Produto guardado com sucesso!")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Erro detalhado ao cadastrar: {e}")
 
     if is_editing:
         if st.button("❌ Cancelar Edição"):

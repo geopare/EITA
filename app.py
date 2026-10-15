@@ -23,12 +23,11 @@ def carregar_dados():
 
 # Função para salvar a lista de produtos atualizada no arquivo CSV
 def salvar_dados(produtos_lista):
-    if len(produtos_lista) > 0:
+    try:
         df = pd.DataFrame(produtos_lista)
         df.to_csv(ARQUIVO_DADOS, index=False)
-    else:
-        if os.path.exists(ARQUIVO_DADOS):
-            os.remove(ARQUIVO_DADOS)
+    except Exception as e:
+        st.error(f"Erro ao salvar dados no disco: {e}")
 
 # Inicialização dos estados na sessão
 if "produtos" not in st.session_state:
@@ -40,7 +39,7 @@ if "edit_index" not in st.session_state:
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "Início"
 
-# Custos padrão ajustados para a Alemanha (Filamento a 14€/kg = 0.014€/g, Hora de Máquina/Energia aprox. 1.00€/h)
+# Custos padrão ajustados para a Alemanha
 if "custo_filamento_g" not in st.session_state:
     st.session_state["custo_filamento_g"] = 0.014
 if "custo_hora_maquina" not in st.session_state:

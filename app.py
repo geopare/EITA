@@ -5,6 +5,11 @@ import os
 st.set_page_config(page_title="Gestão Impressão 3D", page_icon="🖨️", layout="wide")
 
 ARQUIVO_DADOS = "produtos_3d.csv"
+PASTA_IMAGENS = "imagens"
+
+# Garante que a pasta de imagens existe
+if not os.path.exists(PASTA_IMAGENS):
+    os.makedirs(PASTA_IMAGENS)
 
 # Função para carregar os produtos salvos no arquivo CSV
 def carregar_dados():
@@ -35,7 +40,7 @@ if "edit_index" not in st.session_state:
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "Início"
 
-# Custos padrão (pode ajustar na barra lateral)
+# Custos padrão
 if "custo_filamento_g" not in st.session_state:
     st.session_state["custo_filamento_g"] = 0.10
 if "custo_hora_maquina" not in st.session_state:
@@ -44,7 +49,6 @@ if "custo_hora_maquina" not in st.session_state:
 custo_filamento_g = st.session_state["custo_filamento_g"]
 custo_hora_maquina = st.session_state["custo_hora_maquina"]
 
-# Listas e Prefixos
 categorias_lista = [
     "Decoração", "Utilitários", "Miniaturas", "Laços", 
     "Acessórios", "Organização", "Natal", "Religiao", "Outros"
@@ -62,7 +66,7 @@ prefixos_categorias = {
     "Outros": "OUT",
 }
 
-# Barra Lateral para Configurações
+# Barra Lateral
 with st.sidebar:
     st.header("⚙️ Configurações")
     st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (R$/g)", min_value=0.0, value=custo_filamento_g, step=0.01)
@@ -97,7 +101,16 @@ if st.session_state["pagina_atual"] == "Início":
     else:
         for i, p in enumerate(produtos):
             with st.expander(f"{p.get('codigo', 'SKU')} - {p.get('nome', 'Sem nome')} ({p.get('categoria', 'Outros')})"):
-                col_info1, col_info2, col_info3 = st.columns(3)
+                col_img, col_info1, col_info2, col_info3 = st.columns([1.5, 1.5, 1.5, 1.5])
+                
+                # Exibe a imagem se ela existir na pasta
+                with col_img:
+                    caminho_img = p.get("imagem")
+                    if caminho_img and os.path.exists(caminho_img):
+                        st.image(caminho_img, width=120)
+                    else:
+                        st.info("Sem foto")
+
                 with col_info1:
                     st.write(f"**Categoria:** {p.get('categoria')}")
                     st.write(f"**Tempo:** {p.get('tempo')}h")
@@ -108,8 +121,6 @@ if st.session_state["pagina_atual"] == "Início":
                     st.write(f"**Lucro:** R$ {p.get('lucro', 0):.2f}")
                 with col_info3:
                     st.markdown(f"### **Venda: R$ {p.get('venda', 0):.2f}**")
-                    if p.get("imagem"):
-                        st.write(f"📷 Imagem: {p.get('imagem')}")
                         
                 col_A, col_B = st.columns(2)
                 with col_A:
@@ -119,6 +130,14 @@ if st.session_state["pagina_atual"] == "Início":
                         st.rerun()
                 with col_B:
                     if st.button("🗑️ Excluir", key=f"del_{i}"):
+                        # Opcional: apagar o arquivo de imagem do disco se quiser limpar
+                        img_path = p.get("imagem")
+                        if img_path and os.path.exists(img_path):
+                            try:
+                                os.remove(img_path)
+                            except:
+                                pass
+                        
                         st.session_state["produtos"].pop(i)
                         salvar_dados(st.session_state["produtos"])
                         st.success("Produto excluído com sucesso!")
@@ -176,6 +195,11 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
 
     st.markdown("---")
     foto_produto = st.file_uploader("📸 Tirar foto ou carregar imagem do produto", type=["jpg", "jpeg", "png"])
+    
+    # Se já houver imagem cadastrada ao editar, mostra uma pré-visualização dela
+    if is_editing and prod_edit.get("imagem") and os.path.exists(prod_edit.get("imagem")):
+        st.write("Imagem atual:")
+        st.image(prod_edit.get("imagem"), width=150)
 
     st.markdown("")
     btn_texto = "Salvar Alterações" if is_editing else "Cadastrar Produto"
@@ -192,9 +216,16 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 valor_lucro = preco_producao * (margem_desejada / 100)
                 preco_venda = preco_producao + valor_lucro
                 
-                imagem_salva = prod_edit.get("imagem", None)
+                # Tratamento e salvamento físico da imagem no disco
+                caminho_imagem_salva = prod_edit.get("imagem", None)
                 if foto_produto is not None:
-                    imagem_salva = foto_produto.name
+                    # Cria um nome seguro baseado no código do produto para evitar conflitos
+                    nome_arquivo = f"{codigo_sugerido.replace('-', '_')}_{foto_produto.name}"
+                    caminho_imagem_salva = os.path.join(PASTA_IMAGENS, nome_arquivo)
+                    
+                    # Salva o arquivo enviado fisicamente na pasta 'imagens'
+                    with open(caminho_imagem_salva, "wb") as f:
+                        f.write(foto_produto.getbuffer())
 
                 produto_dados = {
                     "codigo": codigo_sugerido,
@@ -206,7 +237,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                     "margem": margem_desejada,
                     "venda": preco_venda,
                     "lucro": valor_lucro,
-                    "imagem": imagem_salva
+                    "imagem": caminho_imagem_salva
                 }
                 
                 if is_editing:

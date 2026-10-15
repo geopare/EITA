@@ -67,10 +67,9 @@ prefixos_categorias = {
 }
 
 # ==========================================
-# BARRA LATERAL (MENU E LOGO)
+# BARRA LATERAL (MENU E CONFIGURAÇÕES)
 # ==========================================
 with st.sidebar:
-    # Exibe a logo se o arquivo 'logo.png' estiver na pasta do projeto
     if os.path.exists("logo.png"):
         st.image("logo.png", use_container_width=True)
     elif os.path.exists("imagens/logo.png"):
@@ -78,7 +77,7 @@ with st.sidebar:
     
     st.title("🖨️ Menu Principal")
     
-    if st.button("🏠 Início / Produtos", use_container_width=True):
+    if st.button("🏠 Início / Painel", use_container_width=True):
         st.session_state["pagina_atual"] = "Início"
         st.session_state["edit_index"] = None
         st.rerun()
@@ -98,30 +97,37 @@ with st.sidebar:
     st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (R$/h)", min_value=0.0, value=custo_hora_maquina, step=0.5)
 
 # ==========================================
-# PÁGINA 1: INÍCIO (LISTA DE PRODUTOS)
+# PÁGINA 1: INÍCIO (PAINEL PRINCIPAL COM LOGO E BOTÕES)
 # ==========================================
 if st.session_state["pagina_atual"] == "Início":
-    st.title("🖨️ Gestão de Impressão 3D")
-    st.markdown("Bem-vindo ao seu painel de produção e catálogo de produtos.")
+    # Exibe a logo principal em destaque no topo da página (se existir)
+    if os.path.exists("logo.png"):
+        st.image("logo.png", width=250)
+    elif os.path.exists("imagens/logo.png"):
+        st.image("imagens/logo.png", width=250)
+
+    st.title("🖨️ Gestão de Produção - Impressão 3D")
+    st.markdown("Bem-vindo ao seu sistema móvel de controlo de custos, catálogo de produtos e orçamentos.")
     
-    col_b1, col_b2 = st.columns([1, 3])
-    with col_b1:
-        if st.button("➕ Novo Produto", type="primary"):
+    st.markdown("### Acesso Rápido")
+    col_bt1, col_bt2 = st.columns(2)
+    with col_bt1:
+        if st.button("➕ Cadastrar Novo Produto", type="primary", use_container_width=True):
             st.session_state["edit_index"] = None
             st.session_state["pagina_atual"] = "Cadastrar"
             st.rerun()
-    with col_b2:
-        if st.button("📑 Ir para Orçamentos"):
+    with col_bt2:
+        if st.button("📑 Ir para Orçamentos", use_container_width=True):
             st.session_state["pagina_atual"] = "Orcamento"
             st.rerun()
             
     st.markdown("---")
-    st.subheader("📦 Produtos Cadastrados")
+    st.subheader("📦 Catálogo de Produtos Cadastrados")
     
     produtos = st.session_state["produtos"]
     
     if not produtos:
-        st.info("Ainda não há produtos cadastrados. Clique no botão acima para começar!")
+        st.info("Ainda não há produtos cadastrados. Clique no botão de cadastro acima para começar!")
     else:
         for i, p in enumerate(produtos):
             with st.expander(f"{p.get('codigo', 'SKU')} - {p.get('nome', 'Sem nome')} ({p.get('categoria', 'Outros')})"):

@@ -166,15 +166,12 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
         margem_desejada = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, step=10.0, value=float(prod_edit.get("margem", 100.0)))
 
     st.markdown("---")
-    #foto_produto = st.file_uploader("📸 Tirar foto ou carregar imagem do produto", type=["jpg", "jpeg", "png"])
+    foto_produto = st.file_uploader("📸 Tirar foto ou carregar imagem do produto", type=["jpg", "jpeg", "png"])
 
     st.markdown("")
     btn_texto = "Salvar Alterações" if is_editing else "Cadastrar Produto"
     
-    # Vamos adicionar um teste de clique imediato
     if st.button(btn_texto, type="primary"):
-        st.write("🔥 O botão foi clicado com sucesso!") # Teste para ver se aparece na tela
-        
         if not nome:
             st.error("Por favor, preencha pelo menos o Nome do produto.")
         else:
@@ -186,8 +183,9 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 valor_lucro = preco_producao * (margem_desejada / 100)
                 preco_venda = preco_producao + valor_lucro
                 
+                # Tratamento seguro da imagem
                 imagem_salva = prod_edit.get("imagem", None)
-                if foto_produto is not None:
+                if 'foto_produto' in locals() and foto_produto is not None:
                     imagem_salva = foto_produto.name
 
                 produto_dados = {
@@ -216,6 +214,12 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 
             except Exception as e:
                 st.error(f"Erro detalhado ao cadastrar: {e}")
+
+    if is_editing:
+        if st.button("❌ Cancelar Edição"):
+            st.session_state["edit_index"] = None
+            st.rerun()
+
 
 # ==========================================
 # PÁGINA 3: PRODUTOS (CATÁLOGO)

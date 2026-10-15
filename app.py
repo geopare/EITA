@@ -44,9 +44,9 @@ categorias_lista = [
     "Utilidades",   
     "Acessórios", 
     "Organização", 
-    "Outros",
     "Natal",
     "Religiosos",
+    "Outros",
     
 ]
 
@@ -128,23 +128,48 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
             "imagem": None
         }
 
+    # 1. Definimos os prefixos das categorias aqui em cima
+    prefixos_categorias = {
+        "Decoração": "DEC",
+        "Utilitários": "UTI",
+        "Miniaturas": "MIN",
+        "Laços": "LAC",
+        "Acessórios": "ACE",
+        "Organização": "ORG",
+        "Natal": "NAT",
+        "Religiao": "REL",
+        "Outros": "OUT",
+        
+    }
+
     with st.form("form_cadastro_produto"):
         col_f1, col_f2 = st.columns(2)
         
         with col_f1:
-            codigo = st.text_input("Código do Produto (SKU)", value=str(prod_edit.get("codigo", "")))
-            nome = st.text_input("Nome do Produto", value=str(prod_edit.get("nome", "")))
-            
+            # 2. Definimos a categoria primeiro para o SKU saber qual usar
             cat_atual = str(prod_edit.get("categoria", "Decoração"))
             cat_index = categorias_lista.index(cat_atual) if cat_atual in categorias_lista else 0
             categoria = st.selectbox("Categoria", categorias_lista, index=cat_index)
+            
+            # 3. Lógica do SKU Automático baseada na categoria selecionada
+            if not is_editing:
+                prefixo_atual = prefixos_categorias.get(categoria, "PRD")
+                produtos_mesma_cat = [p for p in st.session_state["produtos"] if p.get("categoria") == categoria]
+                proximo_num = len(produtos_mesma_cat) + 1
+                codigo_sugerido = f"{prefixo_atual}-{proximo_num:03d}"
+            else:
+                codigo_sugerido = str(prod_edit.get("codigo", ""))
+
+            # Exibe o SKU como campo travado (ou pode tirar o disabled=True se quiser editar)
+            codigo = st.text_input("Código do Produto (SKU Automático)", value=codigo_sugerido, disabled=True)
+            
+            nome = st.text_input("Nome do Produto", value=str(prod_edit.get("nome", "")))
             
         with col_f2:
             tempo_impressao = st.number_input("Tempo de Impressão (em horas)", min_value=0.0, step=0.5, value=float(prod_edit.get("tempo", 0.0)))
             material_uso = st.number_input("Material Usado (em gramas)", min_value=0.0, step=1.0, value=float(prod_edit.get("material", 0.0)))
             margem_desejada = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, step=10.0, value=float(prod_edit.get("margem", 100.0)))
 
-        # Adicionando a opção de foto (compatível com telemóvel para tirar foto ou carregar da galeria)
         st.markdown("---")
         foto_produto = st.file_uploader("📸 Tirar foto ou carregar imagem do produto", type=["jpg", "jpeg", "png"])
 
@@ -152,8 +177,8 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
         submitted_form = st.form_submit_button(btn_texto)
         
         if submitted_form:
-            if not nome or not codigo:
-                st.error("Por favor, preencha pelo menos o Código e o Nome do produto.")
+            if not nome:
+                st.error("Por favor, preencha pelo menos o Nome do produto.")
             else:
                 custo_material = material_uso * custo_filamento_g
                 custo_tempo = tempo_impressao * custo_hora_maquina
@@ -162,13 +187,12 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 valor_lucro = preco_producao * (margem_desejada / 100)
                 preco_venda = preco_producao + valor_lucro
                 
-                # Mantém a imagem anterior se estiver a editar e não carregar uma nova
                 imagem_salva = prod_edit.get("imagem", None)
                 if foto_produto is not None:
-                    imagem_salva = foto_produto.name # Ou o processamento adequado para guardar o ficheiro/bytes
+                    imagem_salva = foto_produto.name
 
                 produto_dados = {
-                    "codigo": codigo,
+                    "codigo": codigo_sugerido, # Salva o SKU gerado automaticamente
                     "nome": nome,
                     "categoria": categoria,
                     "tempo": tempo_impressao,

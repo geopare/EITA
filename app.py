@@ -67,9 +67,15 @@ prefixos_categorias = {
 }
 
 # ==========================================
-# BARRA LATERAL (MENU E CONFIGURAÇÕES)
+# BARRA LATERAL (MENU E LOGO)
 # ==========================================
 with st.sidebar:
+    # Exibe a logo se o arquivo 'logo.png' estiver na pasta do projeto
+    if os.path.exists("logo.png"):
+        st.image("logo.png", use_container_width=True)
+    elif os.path.exists("imagens/logo.png"):
+        st.image("imagens/logo.png", use_container_width=True)
+    
     st.title("🖨️ Menu Principal")
     
     if st.button("🏠 Início / Produtos", use_container_width=True):
@@ -192,7 +198,6 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
         cat_index = categorias_lista.index(cat_atual) if cat_atual in categorias_lista else 0
         categoria = st.selectbox("Categoria", categorias_lista, index=cat_index)
         
-        # SKU Automático corrigido
         if not is_editing:
             prefixo_atual = prefixos_categorias.get(categoria, "PRD")
             produtos_mesma_cat = [p for p in st.session_state["produtos"] if p.get("categoria") == categoria]

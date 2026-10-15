@@ -201,7 +201,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
         st.write("Imagem atual:")
         st.image(prod_edit.get("imagem"), width=150)
 
-    st.markdown("")
+   st.markdown("")
     btn_texto = "Salvar Alterações" if is_editing else "Cadastrar Produto"
     
     if st.button(btn_texto, type="primary"):
@@ -216,16 +216,21 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 valor_lucro = preco_producao * (margem_desejada / 100)
                 preco_venda = preco_producao + valor_lucro
                 
-                # Tratamento e salvamento físico da imagem no disco
+                # Tratamento super seguro para telemóveis e computadores
                 caminho_imagem_salva = prod_edit.get("imagem", None)
                 if foto_produto is not None:
-                    # Cria um nome seguro baseado no código do produto para evitar conflitos
-                    nome_arquivo = f"{codigo_sugerido.replace('-', '_')}_{foto_produto.name}"
-                    caminho_imagem_salva = os.path.join(PASTA_IMAGENS, nome_arquivo)
-                    
-                    # Salva o arquivo enviado fisicamente na pasta 'imagens'
-                    with open(caminho_imagem_salva, "wb") as f:
-                        f.write(foto_produto.getbuffer())
+                    try:
+                        # Limpa o nome do arquivo para evitar caracteres especiais do telemóvel
+                        nome_limpo = "".join(c for c in foto_produto.name if c.isalnum() or c in ('.', '_', '-'))
+                        nome_arquivo = f"{codigo_sugerido.replace('-', '_')}_{nome_limpo}"
+                        caminho_imagem_salva = os.path.join(PASTA_IMAGENS, nome_arquivo)
+                        
+                        # Salva o arquivo fisicamente
+                        with open(caminho_imagem_salva, "wb") as f:
+                            f.write(foto_produto.getbuffer())
+                    except Exception as img_err:
+                        # Se der erro na foto, continua o cadastro sem bloquear o usuário
+                        st.warning(f"Aviso: Não foi possível salvar a imagem ({img_err}), mas o produto será salvo.")
 
                 produto_dados = {
                     "codigo": codigo_sugerido,

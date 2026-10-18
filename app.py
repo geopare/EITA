@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização CSS personalizada
+# Estilização CSS personalizada com a nova cor (#103b57) em todos os textos
 st.markdown("""
 <style>
     /* Estilo geral e fundo */
@@ -18,16 +18,16 @@ st.markdown("""
         background-color: #FFFFFF;
     }
     
-    /* Cor padrão (#1A3644) para todos os textos */
+    /* Cor padrão (#103b57) para todos os textos */
     html, body, [class*="css"], p, span, label, h1, h2, h3, h4, h5, h6, div {
-        color: #1A3644 !important;
+        color: #103b57 !important;
     }
     
     /* Botões minimalistas */
     div.stButton > button {
         border: none;
         background-color: transparent;
-        color: #1A3644 !important;
+        color: #103b57 !important;
         font-weight: 600;
         font-size: 15px;
         letter-spacing: 1.5px;
@@ -43,7 +43,7 @@ st.markdown("""
     
     /* Títulos de Categorias no Catálogo */
     .categoria-titulo {
-        color: #1A3644 !important;
+        color: #103b57 !important;
         font-size: 22px;
         font-weight: 700;
         margin-top: 25px;
@@ -63,22 +63,23 @@ st.markdown("""
         height: 48px;
     }
     .header-titulo-catalogo {
-        color: #1A3644 !important;
+        color: #103b57 !important;
         font-size: 32px;
         font-weight: 400;
         margin: 0;
         padding: 0;
         line-height: 1;
+        letter-spacing: 1.5px;
     }
     
     /* Expander e Inputs */
     .streamlit-expanderHeader {
         font-weight: 600;
-        color: #1A3644 !important;
+        color: #103b57 !important;
     }
     
     .stTextInput input, .stNumberInput input, .stSelectbox div {
-        color: #1A3644 !important;
+        color: #103b57 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -166,7 +167,7 @@ def renderizar_cabecalho(titulo_pagina):
         else:
             html_header = f"""
             <div class="header-catalogo-container">
-                <h3 style="color: #1A3644; margin: 0;">EITA ATELIÊ DE IDEIAS</h3>
+                <h3 style="color: #103b57; margin: 0;">EITA ATELIÊ DE IDEIAS</h3>
                 <div class="header-linha-dourada"></div>
                 <h2 class="header-titulo-catalogo">{titulo_pagina}</h2>
             </div>
@@ -237,7 +238,7 @@ if st.session_state["pagina_atual"] == "Home":
             st.image(caminho_logo, use_container_width=True)
         else:
             st.markdown(
-                "<h1 style='text-align: center; color: #1A3644; font-size: 50px; letter-spacing: 4px;'>E I T A</h1>"
+                "<h1 style='text-align: center; color: #103b57; font-size: 50px; letter-spacing: 4px;'>E I T A</h1>"
                 "<p style='text-align: center; color: #C5A059; letter-spacing: 3px;'>ATELIÊ DE IDEIAS</p>", 
                 unsafe_allow_html=True
             )
@@ -267,7 +268,7 @@ if st.session_state["pagina_atual"] == "Home":
 # ==========================================
 elif st.session_state["pagina_atual"] == "Produtos":
     
-    renderizar_cabecalho("catalogo de Produtos")
+    renderizar_cabecalho("PRODUTOS")
     st.markdown("---")
     
     produtos = st.session_state["produtos"]
@@ -328,7 +329,7 @@ elif st.session_state["pagina_atual"] == "Produtos":
 elif st.session_state["pagina_atual"] == "Cadastrar":
     
     is_editing = st.session_state["edit_index"] is not None
-    titulo_pg = "Editar Produto" if is_editing else "Cadastro de Produto"
+    titulo_pg = "EDITAR PRODUTO" if is_editing else "CADASTRAR PRODUTO"
     
     renderizar_cabecalho(titulo_pg)
     st.markdown("---")
@@ -434,7 +435,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
 # ==========================================
 elif st.session_state["pagina_atual"] == "Orcamento":
     
-    renderizar_cabecalho("Calculadora de Orçamento")
+    renderizar_cabecalho("ORÇAMENTO")
     st.markdown("---")
     
     produtos = st.session_state["produtos"]
@@ -454,7 +455,7 @@ elif st.session_state["pagina_atual"] == "Orcamento":
         
         if produtos_selecionados_chaves:
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("<h3 style='color: #1A3644;'>📦 Detalhes e Quantidades</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='color: #103b57;'>📦 Detalhes e Quantidades</h3>", unsafe_allow_html=True)
             
             total_orcamento = 0.0
             resumo_texto = "📋 *ORÇAMENTO — EITA ATELIÊ DE IDEIAS*\n\n"
@@ -502,7 +503,7 @@ elif st.session_state["pagina_atual"] == "Orcamento":
             resumo_texto += f"-----------------------------\n💰 *TOTAL DO ORÇAMENTO: € {total_orcamento:.2f}*"
 
             st.markdown("---")
-            st.markdown(f"<h2 style='color: #1A3644;'>💰 Total Geral: € {total_orcamento:.2f}</h2>", unsafe_allow_html=True)
+            st.markdown(f"<h2 style='color: #103b57;'>💰 Total Geral: € {total_orcamento:.2f}</h2>", unsafe_allow_html=True)
             
             with st.expander("📄 Ver Resumo Formatado para Enviar ao Cliente"):
                 st.code(resumo_texto, language="text")

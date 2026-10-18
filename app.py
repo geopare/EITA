@@ -49,11 +49,31 @@ st.markdown("""
         padding-bottom: 5px;
     }
     
-    /* Alinhamento vertical perfeito para as colunas do cabeçalho do catálogo */
-    div[data-testid="column"] {
+    /* Bloco Integrado do Cabeçalho do Catálogo */
+    .header-catalogo-container {
         display: flex;
         align-items: center;
-        justify-content: center;
+        gap: 18px; /* Controla a distância entre a logo, a linha e o título */
+    }
+    .header-linha-dourada {
+        border-left: 2px solid #C5A059;
+        height: 48px;
+    }
+    .header-titulo-catalogo {
+        color: #1A3644;
+        font-size: 32px;
+        font-weight: 400;
+        margin: 0;
+        padding: 0;
+        line-height: 1;
+    }
+    
+    /* Alinhamento do botão voltar */
+    .coluna-voltar-container {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        height: 100%;
     }
     
     /* Esconder bordas pesadas do expander */
@@ -218,26 +238,40 @@ if st.session_state["pagina_atual"] == "Home":
             st.rerun()
 
 # ==========================================
-# PÁGINA 2: CATÁLOGO DE PRODUTOS (ALINHAMENTO VERTICAL PERFEITO)
+# PÁGINA 2: CATÁLOGO DE PRODUTOS (ALINHAMENTO E ESPAÇAMENTO REFINADOS)
 # ==========================================
 elif st.session_state["pagina_atual"] == "Produtos":
     
-    # Cabeçalho com alinhamento vertical centralizado
-    col_logo, col_div, col_titulo, col_voltar = st.columns([2.5, 0.2, 4, 1.5])
+    # Dividimos em apenas 2 colunas: O bloco do cabeçalho (esquerda) e o Botão VOLTAr (direita)
+    col_cabecalho, col_voltar = st.columns([5, 1])
     
-    with col_logo:
+    with col_cabecalho:
+        # Se a logo existir, carregamos em HTML inline junto com a linha e o título
         if caminho_logo2:
-            st.image(caminho_logo2, width=180)
-        else:
-            st.markdown("<h3 style='color: #1A3644; margin: 0;'>EITA ATELIÊ DE IDEIAS</h3>", unsafe_allow_html=True)
+            import base64
+            with open(caminho_logo2, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode()
             
-    with col_div:
-        st.markdown("<div style='border-left: 2px solid #C5A059; height: 50px; margin: auto;'></div>", unsafe_allow_html=True)
-        
-    with col_titulo:
-        st.markdown("<h2 style='color: #1A3644; font-weight: 400; margin: 0;'>catalogo de Produtos</h2>", unsafe_allow_html=True)
-        
+            html_header = f"""
+            <div class="header-catalogo-container">
+                <img src="data:image/png;base64,{encoded_string}" style="max-height: 55px; width: auto;" />
+                <div class="header-linha-dourada"></div>
+                <h2 class="header-titulo-catalogo">catalogo de Produtos</h2>
+            </div>
+            """
+            st.markdown(html_header, unsafe_allow_html=True)
+        else:
+            html_header = """
+            <div class="header-catalogo-container">
+                <h3 style="color: #1A3644; margin: 0;">EITA ATELIÊ DE IDEIAS</h3>
+                <div class="header-linha-dourada"></div>
+                <h2 class="header-titulo-catalogo">catalogo de Produtos</h2>
+            </div>
+            """
+            st.markdown(html_header, unsafe_allow_html=True)
+            
     with col_voltar:
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
         if st.button("VOLTAr", use_container_width=True):
             st.session_state["pagina_atual"] = "Home"
             st.rerun()

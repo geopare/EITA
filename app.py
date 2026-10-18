@@ -12,7 +12,7 @@ st.set_page_config(
 # Estilização CSS personalizada para visual clean / elegante
 st.markdown("""
 <style>
-    /* Estilo geral e fontes */
+    /* Estilo geral e fundo */
     .main {
         background-color: #FFFFFF;
     }
@@ -29,13 +29,24 @@ st.markdown("""
         font-size: 15px;
         letter-spacing: 1.5px;
         text-transform: uppercase;
-        padding: 12px 24px;
+        padding: 10px 20px;
         transition: all 0.3s ease;
     }
     div.stButton > button:hover {
         color: #C5A059;
         background-color: #F8F9FA;
         border-radius: 8px;
+    }
+    
+    /* Títulos de Categorias no Catálogo */
+    .categoria-titulo {
+        color: #1A3644;
+        font-size: 22px;
+        font-weight: 700;
+        margin-top: 25px;
+        margin-bottom: 10px;
+        border-bottom: 2px solid #C5A059;
+        padding-bottom: 5px;
     }
     
     /* Esconder bordas pesadas do expander */
@@ -151,7 +162,6 @@ with st.sidebar:
 # ==========================================
 if st.session_state["pagina_atual"] == "Home":
     
-    # Espaçamento superior para centralizar
     st.markdown("<br><br>", unsafe_allow_html=True)
     
     # Exibição Centralizada da Logo
@@ -168,90 +178,114 @@ if st.session_state["pagina_atual"] == "Home":
             
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    # Menu Limpo Inferior (Produtos | Cadastrar | Orçamento)
+    # Menu Limpo Inferior (PROTUDOS | CADASTRA NOVO PRODUTO | ORCAMENTO)
     col_m1, col_m2, col_m3 = st.columns([1, 1, 1])
     
     with col_m1:
-        if st.button("PRODUTOS", use_container_width=True):
+        if st.button("PROTUDOS", use_container_width=True):
             st.session_state["pagina_atual"] = "Produtos"
             st.rerun()
             
     with col_m2:
-        if st.button("CADASTRAR NOVO PRODUTO", use_container_width=True):
+        if st.button("CADASTRA NOVO PRODUTO", use_container_width=True):
             st.session_state["edit_index"] = None
             st.session_state["pagina_atual"] = "Cadastrar"
             st.rerun()
             
     with col_m3:
-        if st.button("ORÇAMENTO", use_container_width=True):
+        if st.button("ORCAMENTO", use_container_width=True):
             st.session_state["pagina_atual"] = "Orcamento"
             st.rerun()
 
 # ==========================================
-# PÁGINA 2: CATÁLOGO DE PRODUTOS
+# PÁGINA 2: CATÁLOGO DE PRODUTOS (LAYOUT LOGO2)
 # ==========================================
 elif st.session_state["pagina_atual"] == "Produtos":
-    col_voltar, col_t = st.columns([1, 5])
+    
+    # Cabeçalho no estilo Logo2: Logo + Divisor + Título + Botão VOLTAr
+    col_logo, col_div, col_titulo, col_voltar = st.columns([2.5, 0.2, 4, 1.5])
+    
+    with col_logo:
+        if caminho_logo:
+            st.image(caminho_logo, width=220)
+        else:
+            st.markdown("<h3 style='color: #1A3644; margin: 0;'>EITA ATELIÊ DE IDEIAS</h3>", unsafe_allow_html=True)
+            
+    with col_div:
+        st.markdown("<div style='border-left: 2px solid #C5A059; height: 60px; margin: auto;'></div>", unsafe_allow_html=True)
+        
+    with col_titulo:
+        st.markdown("<h2 style='color: #1A3644; font-weight: 400; margin-top: 10px;'>catalogo de Produtos</h2>", unsafe_allow_html=True)
+        
     with col_voltar:
-        if st.button("← VOLTAR"):
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("VOLTAr", use_container_width=True):
             st.session_state["pagina_atual"] = "Home"
             st.rerun()
-    with col_t:
-        st.markdown("<h2 style='color: #1A3644; margin: 0;'>Catálogo de Produtos</h2>", unsafe_allow_html=True)
-        
+            
     st.markdown("---")
     
     produtos = st.session_state["produtos"]
+    
     if not produtos:
         st.info("Nenhum produto cadastrado até o momento.")
     else:
-        for i, p in enumerate(produtos):
-            with st.expander(f"{p.get('codigo', 'SKU')} — {p.get('nome', 'Sem nome')} ({p.get('categoria', 'Outros')})"):
-                col_img, col_info1, col_info2, col_info3 = st.columns([1.5, 1.5, 1.5, 1.5])
+        # Agrupamento de Produtos por Categoria
+        for cat in categorias_lista:
+            prods_cat = [p for p in produtos if p.get("categoria") == cat]
+            
+            if prods_cat:
+                st.markdown(f"<div class='categoria-titulo'>{cat}</div>", unsafe_allow_html=True)
                 
-                with col_img:
-                    caminho_img = p.get("imagem")
-                    if caminho_img and isinstance(caminho_img, str) and os.path.exists(caminho_img):
-                        st.image(caminho_img, width=130)
-                    else:
-                        st.write("*(Sem Imagem)*")
-
-                with col_info1:
-                    st.write(f"**Categoria:** {p.get('categoria')}")
-                    st.write(f"**Tempo:** {p.get('tempo')} h")
-                    st.write(f"**Material:** {p.get('material')} g")
-                with col_info2:
-                    st.write(f"**Custo Produção:** € {p.get('producao', 0):.2f}")
-                    st.write(f"**Margem:** {p.get('margem')}%")
-                    st.write(f"**Lucro:** € {p.get('lucro', 0):.2f}")
-                with col_info3:
-                    st.markdown(f"### **€ {p.get('venda', 0):.2f}**")
+                for i_cat, p in enumerate(prods_cat):
+                    # Encontrar o índice global do produto
+                    idx_global = produtos.index(p)
+                    
+                    with st.expander(f"{p.get('codigo', 'SKU')} — {p.get('nome', 'Sem nome')}"):
+                        col_img, col_info1, col_info2, col_info3 = st.columns([1.5, 1.5, 1.5, 1.5])
                         
-                col_A, col_B, _ = st.columns([1, 1, 3])
-                with col_A:
-                    if st.button("Editar", key=f"edit_{i}"):
-                        st.session_state["edit_index"] = i
-                        st.session_state["pagina_atual"] = "Cadastrar"
-                        st.rerun()
-                with col_B:
-                    if st.button("Excluir", key=f"del_{i}"):
-                        img_path = p.get("imagem")
-                        if img_path and isinstance(img_path, str) and os.path.exists(img_path):
-                            try:
-                                os.remove(img_path)
-                            except:
-                                pass
-                        st.session_state["produtos"].pop(i)
-                        salvar_dados(st.session_state["produtos"])
-                        st.rerun()
+                        with col_img:
+                            caminho_img = p.get("imagem")
+                            if caminho_img and isinstance(caminho_img, str) and os.path.exists(caminho_img):
+                                st.image(caminho_img, width=130)
+                            else:
+                                st.write("*(Sem Imagem)*")
+
+                        with col_info1:
+                            st.write(f"**Tempo:** {p.get('tempo')} h")
+                            st.write(f"**Material:** {p.get('material')} g")
+                        with col_info2:
+                            st.write(f"**Custo Produção:** € {p.get('producao', 0):.2f}")
+                            st.write(f"**Margem:** {p.get('margem')}%")
+                            st.write(f"**Lucro:** € {p.get('lucro', 0):.2f}")
+                        with col_info3:
+                            st.markdown(f"### **€ {p.get('venda', 0):.2f}**")
+                                
+                        col_A, col_B, _ = st.columns([1, 1, 3])
+                        with col_A:
+                            if st.button("Editar", key=f"edit_cat_{idx_global}"):
+                                st.session_state["edit_index"] = idx_global
+                                st.session_state["pagina_atual"] = "Cadastrar"
+                                st.rerun()
+                        with col_B:
+                            if st.button("Excluir", key=f"del_cat_{idx_global}"):
+                                img_path = p.get("imagem")
+                                if img_path and isinstance(img_path, str) and os.path.exists(img_path):
+                                    try:
+                                        os.remove(img_path)
+                                    except:
+                                        pass
+                                st.session_state["produtos"].pop(idx_global)
+                                salvar_dados(st.session_state["produtos"])
+                                st.rerun()
 
 # ==========================================
 # PÁGINA 3: CADASTRAR / EDITAR PRODUTO
 # ==========================================
 elif st.session_state["pagina_atual"] == "Cadastrar":
-    col_voltar, col_t = st.columns([1, 5])
+    col_voltar, col_t = st.columns([1.5, 5])
     with col_voltar:
-        if st.button("← VOLTAR"):
+        if st.button("VOLTAr"):
             st.session_state["edit_index"] = None
             st.session_state["pagina_atual"] = "Home"
             st.rerun()
@@ -339,9 +373,9 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
 # PÁGINA 4: GERAR ORÇAMENTO
 # ==========================================
 elif st.session_state["pagina_atual"] == "Orcamento":
-    col_voltar, col_t = st.columns([1, 5])
+    col_voltar, col_t = st.columns([1.5, 5])
     with col_voltar:
-        if st.button("← VOLTAR"):
+        if st.button("VOLTAr"):
             st.session_state["pagina_atual"] = "Home"
             st.rerun()
     with col_t:

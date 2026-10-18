@@ -1,6 +1,31 @@
 codigo,nome,categoria,tempo,material,producao,margem,venda,lucro,imagem
-DEC-002,Mini Vaso,Decoração,1.0,15.0,1.21,100.0,2.42,1.21,imagens/DEC_002_IMG_4032.jpeg
+DEC-002,Mini Vaso,Decoração,1.1,7.0,1.1980000000000002,100.0,2.3960000000000004,1.1980000000000002,imagens/DEC_002_IMG_4032.jpeg
 DEC-003,Vaso Pequeno,Decoração,1.5,16.0,1.724,100.0,3.448,1.724,imagens/DEC_003_IMG_4033.jpeg
-NAT-001,Porta Vela,Natal,2.0,20.0,2.28,100.0,4.5600000000000005,2.28,imagens/NAT_001_IMG_4031.jpeg
+NAT-001,Porta Vela,Natal,3.55,53.0,4.292,100.0,8.584,4.292,imagens/NAT_001_IMG_4031.jpeg
 NAT-002,Rena e Trenó ,Natal,4.0,21.0,4.294,100.0,8.588,4.294,imagens/NAT_002_IMG_4034.jpeg
 DEC-004,Mão,Decoração,2.5,101.0,3.914,100.0,7.827999999999999,3.914,
+DEC-004,Anjo Vasado,Decoração,4.3,38.0,4.832,100.0,9.664,4.832,imagens/DEC_004_IMG_4037.jpeg
+NAT-003,Feliz Natal ,Natal,3.5,60.0,4.34,100.0,8.68,4.34,imagens/NAT_003_IMG_4038.jpeg
+DEC-005,Anjo,Decoração,3.0,45.0,3.63,100.0,7.26,3.63,imagens/DEC_005_IMG_4039.jpeg
+NAT-004,Pinheiro,Natal,3.85,88.0,5.082,100.0,10.164,5.082,imagens/NAT_004_IMG_4040.jpeg
+NAT-005,Nascimento,Natal,4.25,130.0,6.07,100.0,12.14,6.07,imagens/NAT_005_IMG_4041.jpeg
+NAT-006,Feliz Natal 2,Natal,1.75,44.0,2.366,100.0,4.732,2.366,imagens/NAT_006_image.jpg
+NAT-007,Nascimento 2,Natal,3.75,100.0,5.15,100.0,10.3,5.15,imagens/NAT_007_image.jpg
+NAT-008,Kit Porta Guardanapo ,Natal,1.0,21.0,1.294,100.0,2.588,1.294,imagens/NAT_008_image.jpg
+NAT-009,Árvore Estrelas + Base,Natal,2.0,50.0,2.7,100.0,5.4,2.7,imagens/NAT_009_image.jpg
+NAT-010,Renas,Natal,3.6,35.0,4.09,100.0,8.18,4.09,imagens/NAT_010_IMG_4042.jpeg
+NAT-011,Pinheiro Vela,Natal,3.25,60.0,4.09,100.0,8.18,4.09,imagens/NAT_011_IMG_4043.jpeg
+DEC-006,Anjo Vazado grande ,Decoração,6.5,61.0,7.354,100.0,14.708,7.354,imagens/DEC_006_IMG_4044.jpeg
+NAT-012,Presépio Pintura,Natal,5.25,192.0,7.938000000000001,100.0,15.876,7.938000000000001,imagens/NAT_012_IMG_4045.jpeg
+DEC-007,Extra Presépio Pintura ,Decoração,1.6,52.0,2.3280000000000003,100.0,4.656000000000001,2.3280000000000003,imagens/DEC_007_IMG_4046.jpeg
+NAT-013,Pinheiro Estrela,Natal,3.8,51.0,4.513999999999999,100.0,9.028,4.513999999999999,imagens/NAT_013_IMG_4047.jpeg
+NAT-014,Bandeja Pinheiro ,Natal,2.15,93.0,3.452,100.0,6.904,3.452,imagens/NAT_014_image.jpg
+DEC-008,Kit casas,Decoração,3.37,98.0,4.742,100.0,9.484,4.742,imagens/DEC_008_image.jpg
+DEC-009, Bandeja ,Decoração,5.55,106.0,7.034,100.0,14.068,7.034,imagens/DEC_009_image.jpg
+DEC-010,Bandeja Redonda ,Decoração,3.9,146.0,5.944,100.0,11.888,5.944,imagens/DEC_010_image.jpg
+NAT-015,Pinheiro Bolas ,Natal,3.13,58.0,3.942,100.0,7.884,3.942,imagens/NAT_015_image.jpg
+NAT-016,Nascimento 3,Natal,2.15,50.0,2.85,100.0,5.7,2.85,imagens/NAT_016_image.jpg
+NAT-017,Enfeite de Porta 1,Natal,2.67,72.0,3.678,100.0,7.356,3.678,imagens/NAT_017_image.jpg
+NAT-018,Enfeite de Porta HoHoHo,Natal,1.35,43.0,1.952,100.0,3.904,1.952,imagens/NAT_018_image.jpg
+NAT-019,Porta guardanapo ,Natal,1.25,37.0,1.768,100.0,3.536,1.768,imagens/NAT_019_image.jpg
+NAT-020,Porta guardanapo laço ,Natal,1.32,20.0,1.6,100.0,3.2,1.6,imagens/NAT_020_image.jpg

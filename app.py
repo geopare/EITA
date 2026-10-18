@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização CSS personalizada com a nova cor (#103b57) em todos os textos
+# Estilização CSS personalizada com a cor (#103b57) em todos os textos
 st.markdown("""
 <style>
     /* Estilo geral e fundo */
@@ -150,8 +150,10 @@ for p in ["logo2.png", "imagens/logo2.png", "logo2.jpg"]:
 if not caminho_logo2:
     caminho_logo2 = caminho_logo
 
-def renderizar_cabecalho(titulo_pagina):
-    col_cabecalho, col_voltar = st.columns([5, 1])
+# Renderização do cabeçalho
+def renderizar_cabecalho(titulo_pagina, exibir_btn_novo=False):
+    col_cabecalho, col_acoes = st.columns([4, 2])
+    
     with col_cabecalho:
         if caminho_logo2:
             with open(caminho_logo2, "rb") as image_file:
@@ -174,12 +176,25 @@ def renderizar_cabecalho(titulo_pagina):
             """
             st.markdown(html_header, unsafe_allow_html=True)
             
-    with col_voltar:
+    with col_acoes:
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-        if st.button("VOLTAr", use_container_width=True):
-            st.session_state["edit_index"] = None
-            st.session_state["pagina_atual"] = "Home"
-            st.rerun()
+        if exibir_btn_novo:
+            btn_col1, btn_col2 = st.columns(2)
+            with btn_col1:
+                if st.button("➕ NOVO", use_container_width=True):
+                    st.session_state["edit_index"] = None
+                    st.session_state["pagina_atual"] = "Cadastrar"
+                    st.rerun()
+            with btn_col2:
+                if st.button("VOLTAr", use_container_width=True):
+                    st.session_state["edit_index"] = None
+                    st.session_state["pagina_atual"] = "Home"
+                    st.rerun()
+        else:
+            if st.button("VOLTAr", use_container_width=True):
+                st.session_state["edit_index"] = None
+                st.session_state["pagina_atual"] = "Home"
+                st.rerun()
 
 # ==========================================
 # BARRA LATERAL (MENU & BACKUP)
@@ -268,7 +283,8 @@ if st.session_state["pagina_atual"] == "Home":
 # ==========================================
 elif st.session_state["pagina_atual"] == "Produtos":
     
-    renderizar_cabecalho("PRODUTOS")
+    # Exibe o botão ➕ NOVO ao lado de VOLTAr
+    renderizar_cabecalho("PRODUTOS", exibir_btn_novo=True)
     st.markdown("---")
     
     produtos = st.session_state["produtos"]

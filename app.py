@@ -4,30 +4,43 @@ import os
 
 st.set_page_config(page_title="Gestão Impressão 3D", page_icon="🖨️", layout="wide")
 
-ARQUIVO_DADOS = "produtos_3d.csv"
+# ==========================================
+# CONFIGURAÇÃO DO GOOGLE SHEETS
+# ==========================================
+SPREADSHEET_ID = "1cZNolJG7_LWXlC_nVdXif_l-kHYfmYlD_FvJcpDE1dI"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv"
+
+ARQUIVO_LOCAL = "produtos_3d.csv"
 PASTA_IMAGENS = "imagens"
 
-# Garante que a pasta de imagens existe
 if not os.path.exists(PASTA_IMAGENS):
     os.makedirs(PASTA_IMAGENS)
 
-# Função para carregar os produtos salvos no arquivo CSV
+# Função para carregar os produtos do Google Sheets (com fallback local)
 def carregar_dados():
-    if os.path.exists(ARQUIVO_DADOS):
+    if SPREADSHEET_ID != "":
         try:
-            df = pd.read_csv(ARQUIVO_DADOS)
+            df = pd.read_csv(SHEET_URL)
+            df = df.dropna(how="all")
+            return df.to_dict("records")
+        except Exception:
+            pass
+            
+    if os.path.exists(ARQUIVO_LOCAL):
+        try:
+            df = pd.read_csv(ARQUIVO_LOCAL)
             return df.to_dict("records")
         except Exception:
             return []
     return []
 
-# Função para salvar a lista de produtos atualizada no arquivo CSV
+# Função para salvar a lista de produtos localmente e na sessão
 def salvar_dados(produtos_lista):
     try:
         df = pd.DataFrame(produtos_lista)
-        df.to_csv(ARQUIVO_DADOS, index=False)
+        df.to_csv(ARQUIVO_LOCAL, index=False)
     except Exception as e:
-        st.error(f"Erro ao salvar dados no disco: {e}")
+        st.error(f"Erro ao salvar dados localmente: {e}")
 
 # Inicialização dos estados na sessão
 if "produtos" not in st.session_state:
@@ -39,7 +52,7 @@ if "edit_index" not in st.session_state:
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "Início"
 
-# Custos padrão ajustados para a Alemanha
+# Custos padrão ajustados para a Alemanha (Filamento a 14€/kg = 0.014€/g, Hora de Máquina/Energia approx. 1.00€/h)
 if "custo_filamento_g" not in st.session_state:
     st.session_state["custo_filamento_g"] = 0.014
 if "custo_hora_maquina" not in st.session_state:
@@ -94,6 +107,12 @@ with st.sidebar:
     st.header("⚙️ Custos Base (Alemanha)")
     st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (€/g)", min_value=0.0, value=custo_filamento_g, step=0.001, format="%.3f")
     st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (€/h)", min_value=0.0, value=custo_hora_maquina, step=0.10, format="%.2f")
+
+    st.markdown("---")
+    if st.button("🔄 Recarregar do Google Sheets"):
+        st.session_state["produtos"] = carregar_dados()
+        st.success("Dados recarregados da planilha!")
+        st.rerun()
 
 # ==========================================
 # PÁGINA 1: INÍCIO (PAINEL ORGANIZADO)
@@ -338,6 +357,6 @@ elif st.session_state["pagina_atual"] == "Orcamento":
             st.markdown(f"## 💰 **Valor Total do Orçamento: € {total_geral:.2f}**")
             
             if st.button("🖨️ Finalizar / Copiar Resumo do Orçamento", type="primary"):
-                st.success("Orçamento global calculado com sucesso! Pronto para enviar ao cliente.")
+                st.success("Orçamento global calculated com sucesso! Pronto para enviar ao cliente.")
         else:
             st.info("Selecione um ou mais produtos acima para começar a montar o orçamento.")

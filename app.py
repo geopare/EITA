@@ -2,7 +2,49 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="Gestão Impressão 3D", page_icon="🖨️", layout="wide")
+st.set_page_config(
+    page_title="EITA - Ateliê de Ideias", 
+    page_icon="💡", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Estilização CSS personalizada para visual clean / elegante
+st.markdown("""
+<style>
+    /* Estilo geral e fontes */
+    .main {
+        background-color: #FFFFFF;
+    }
+    
+    /* Esconder cabeçalho padrão do Streamlit */
+    header {visibility: hidden;}
+    
+    /* Botões minimalistas no menu central */
+    div.stButton > button {
+        border: none;
+        background-color: transparent;
+        color: #1A3644;
+        font-weight: 600;
+        font-size: 15px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        padding: 12px 24px;
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:hover {
+        color: #C5A059;
+        background-color: #F8F9FA;
+        border-radius: 8px;
+    }
+    
+    /* Esconder bordas pesadas do expander */
+    .streamlit-expanderHeader {
+        font-weight: 600;
+        color: #1A3644;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 ARQUIVO_DADOS = "produtos_3d.csv"
 PASTA_IMAGENS = "imagens"
@@ -10,7 +52,7 @@ PASTA_IMAGENS = "imagens"
 if not os.path.exists(PASTA_IMAGENS):
     os.makedirs(PASTA_IMAGENS)
 
-# Função para carregar os produtos do arquivo local
+# Carregar e Salvar Dados
 def carregar_dados():
     if os.path.exists(ARQUIVO_DADOS):
         try:
@@ -20,7 +62,6 @@ def carregar_dados():
             return []
     return []
 
-# Função para salvar a lista de produtos no arquivo local
 def salvar_dados(produtos_lista):
     try:
         df = pd.DataFrame(produtos_lista)
@@ -28,7 +69,7 @@ def salvar_dados(produtos_lista):
     except Exception as e:
         st.error(f"Erro ao salvar dados localmente: {e}")
 
-# Inicialização dos estados na sessão
+# Sessão
 if "produtos" not in st.session_state:
     st.session_state["produtos"] = carregar_dados()
 
@@ -36,9 +77,9 @@ if "edit_index" not in st.session_state:
     st.session_state["edit_index"] = None
 
 if "pagina_atual" not in st.session_state:
-    st.session_state["pagina_atual"] = "Início"
+    st.session_state["pagina_atual"] = "Home"
 
-# Custos padrão ajustados para a Alemanha
+# Custos Alemanha
 if "custo_filamento_g" not in st.session_state:
     st.session_state["custo_filamento_g"] = 0.014
 if "custo_hora_maquina" not in st.session_state:
@@ -53,174 +94,180 @@ categorias_lista = [
 ]
 
 prefixos_categorias = {
-    "Decoração": "DEC",
-    "Utilitários": "UTI",
-    "Miniaturas": "MIN",
-    "Laços": "LAC",
-    "Acessórios": "ACE",
-    "Organização": "ORG",
-    "Natal": "NAT",
-    "Religiao": "REL",
-    "Outros": "OUT",
+    "Decoração": "DEC", "Utilitários": "UTI", "Miniaturas": "MIN",
+    "Laços": "LAC", "Acessórios": "ACE", "Organização": "ORG",
+    "Natal": "NAT", "Religiao": "REL", "Outros": "OUT",
 }
 
+# Encontrar caminho da logo
+caminho_logo = None
+for p in ["logo.png", "imagens/logo.png", "logo.jpg"]:
+    if os.path.exists(p):
+        caminho_logo = p
+        break
+
 # ==========================================
-# BARRA LATERAL (MENU E BACKUP)
+# BARRA LATERAL (MENU SECUNDÁRIO E BACKUP)
 # ==========================================
 with st.sidebar:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", use_container_width=True)
-    elif os.path.exists("imagens/logo.png"):
-        st.image("imagens/logo.png", use_container_width=True)
+    st.title("⚙️ Configurações & Backup")
     
-    st.title("🖨️ Menu Principal")
-    
-    if st.button("🏠 Início / Produtos", use_container_width=True):
-        st.session_state["pagina_atual"] = "Início"
+    if st.button("🏠 Ir para a Tela Inicial", use_container_width=True):
+        st.session_state["pagina_atual"] = "Home"
         st.session_state["edit_index"] = None
-        st.rerun()
-        
-    if st.button("➕ Cadastrar Novo Produto", use_container_width=True):
-        st.session_state["edit_index"] = None
-        st.session_state["pagina_atual"] = "Cadastrar"
-        st.rerun()
-        
-    if st.button("📑 Gerar Orçamento", use_container_width=True):
-        st.session_state["pagina_atual"] = "Orcamento"
         st.rerun()
 
     st.markdown("---")
-    st.header("⚙️ Custos Base (Alemanha)")
+    st.subheader("💶 Custos Base (Alemanha)")
     st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (€/g)", min_value=0.0, value=custo_filamento_g, step=0.001, format="%.3f")
     st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (€/h)", min_value=0.0, value=custo_hora_maquina, step=0.10, format="%.2f")
 
     st.markdown("---")
-    st.header("💾 Backup e Segurança")
-    
-    # Exportar/Baixar catálogo atual em CSV
+    st.subheader("💾 Gestão de Backup")
     if st.session_state["produtos"]:
         df_export = pd.DataFrame(st.session_state["produtos"])
         csv_data = df_export.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Baixar Backup dos Produtos",
+            label="📥 Baixar Backup (CSV)",
             data=csv_data,
             file_name="produtos_3d_backup.csv",
             mime="text/csv",
             use_container_width=True
         )
     
-    # Importar backup salvo anteriormente
     arquivo_backup = st.file_uploader("📤 Restaurar Backup (CSV)", type=["csv"])
     if arquivo_backup is not None:
         try:
             df_import = pd.read_csv(arquivo_backup)
             st.session_state["produtos"] = df_import.to_dict("records")
             salvar_dados(st.session_state["produtos"])
-            st.success("Backup restaurado com sucesso!")
+            st.success("Backup restaurado!")
             st.rerun()
         except Exception as e:
             st.error(f"Erro ao carregar backup: {e}")
 
 # ==========================================
-# PÁGINA 1: INÍCIO (PAINEL ORGANIZADO)
+# PÁGINA INICIAL: CLEAN / DESIGN MINIMALISTA
 # ==========================================
-if st.session_state["pagina_atual"] == "Início":
-    col_logo, col_titulo = st.columns([1, 4])
-    with col_logo:
-        if os.path.exists("logo.png"):
-            st.image("logo.png", width=120)
-        elif os.path.exists("imagens/logo.png"):
-            st.image("imagens/logo.png", width=120)
-    with col_titulo:
-        st.title("🖨️ Gestão de Impressão 3D")
-        st.markdown("Painel de produção, catálogo e orçamentos.")
+if st.session_state["pagina_atual"] == "Home":
     
-    col_b1, col_b2, _ = st.columns([1, 1, 2])
-    with col_b1:
-        if st.button("➕ Novo Produto", type="primary", use_container_width=True):
+    # Espaçamento superior para centralizar
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    # Exibição Centralizada da Logo
+    col_e, col_centro, col_d = st.columns([1, 2, 1])
+    with col_centro:
+        if caminho_logo:
+            st.image(caminho_logo, use_container_width=True)
+        else:
+            st.markdown(
+                "<h1 style='text-align: center; color: #1A3644; font-size: 50px; letter-spacing: 4px;'>E I T A</h1>"
+                "<p style='text-align: center; color: #888; letter-spacing: 3px;'>ATELIÊ DE IDEIAS</p>", 
+                unsafe_allow_html=True
+            )
+            
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    # Menu Limpo Inferior (Produtos | Cadastrar | Orçamento)
+    col_m1, col_m2, col_m3 = st.columns([1, 1, 1])
+    
+    with col_m1:
+        if st.button("PRODUTOS", use_container_width=True):
+            st.session_state["pagina_atual"] = "Produtos"
+            st.rerun()
+            
+    with col_m2:
+        if st.button("CADASTRAR NOVO PRODUTO", use_container_width=True):
             st.session_state["edit_index"] = None
             st.session_state["pagina_atual"] = "Cadastrar"
             st.rerun()
-    with col_b2:
-        if st.button("📑 Orçamentos", use_container_width=True):
+            
+    with col_m3:
+        if st.button("ORÇAMENTO", use_container_width=True):
             st.session_state["pagina_atual"] = "Orcamento"
             st.rerun()
-            
+
+# ==========================================
+# PÁGINA 2: CATÁLOGO DE PRODUTOS
+# ==========================================
+elif st.session_state["pagina_atual"] == "Produtos":
+    col_voltar, col_t = st.columns([1, 5])
+    with col_voltar:
+        if st.button("← VOLTAR"):
+            st.session_state["pagina_atual"] = "Home"
+            st.rerun()
+    with col_t:
+        st.markdown("<h2 style='color: #1A3644; margin: 0;'>Catálogo de Produtos</h2>", unsafe_allow_html=True)
+        
     st.markdown("---")
-    st.subheader("📦 Produtos Cadastrados")
     
     produtos = st.session_state["produtos"]
-    
     if not produtos:
-        st.info("Ainda não há produtos cadastrados. Clique em 'Novo Produto' para começar!")
+        st.info("Nenhum produto cadastrado até o momento.")
     else:
         for i, p in enumerate(produtos):
-            with st.expander(f"{p.get('codigo', 'SKU')} - {p.get('nome', 'Sem nome')} ({p.get('categoria', 'Outros')})"):
+            with st.expander(f"{p.get('codigo', 'SKU')} — {p.get('nome', 'Sem nome')} ({p.get('categoria', 'Outros')})"):
                 col_img, col_info1, col_info2, col_info3 = st.columns([1.5, 1.5, 1.5, 1.5])
                 
                 with col_img:
                     caminho_img = p.get("imagem")
                     if caminho_img and isinstance(caminho_img, str) and os.path.exists(caminho_img):
-                        st.image(caminho_img, width=120)
+                        st.image(caminho_img, width=130)
                     else:
-                        st.info("Sem foto")
+                        st.write("*(Sem Imagem)*")
 
                 with col_info1:
                     st.write(f"**Categoria:** {p.get('categoria')}")
-                    st.write(f"**Tempo:** {p.get('tempo')}h")
-                    st.write(f"**Material:** {p.get('material')}g")
+                    st.write(f"**Tempo:** {p.get('tempo')} h")
+                    st.write(f"**Material:** {p.get('material')} g")
                 with col_info2:
                     st.write(f"**Custo Produção:** € {p.get('producao', 0):.2f}")
                     st.write(f"**Margem:** {p.get('margem')}%")
                     st.write(f"**Lucro:** € {p.get('lucro', 0):.2f}")
                 with col_info3:
-                    st.markdown(f"### **Venda: € {p.get('venda', 0):.2f}**")
+                    st.markdown(f"### **€ {p.get('venda', 0):.2f}**")
                         
-                col_A, col_B = st.columns(2)
+                col_A, col_B, _ = st.columns([1, 1, 3])
                 with col_A:
-                    if st.button("✏️ Editar", key=f"edit_{i}"):
+                    if st.button("Editar", key=f"edit_{i}"):
                         st.session_state["edit_index"] = i
                         st.session_state["pagina_atual"] = "Cadastrar"
                         st.rerun()
                 with col_B:
-                    if st.button("🗑️ Excluir", key=f"del_{i}"):
+                    if st.button("Excluir", key=f"del_{i}"):
                         img_path = p.get("imagem")
                         if img_path and isinstance(img_path, str) and os.path.exists(img_path):
                             try:
                                 os.remove(img_path)
                             except:
                                 pass
-                        
                         st.session_state["produtos"].pop(i)
                         salvar_dados(st.session_state["produtos"])
-                        st.success("Produto excluído com sucesso!")
                         st.rerun()
 
 # ==========================================
-# PÁGINA 2: CADASTRAR / EDITAR PRODUTOS
+# PÁGINA 3: CADASTRAR / EDITAR PRODUTO
 # ==========================================
 elif st.session_state["pagina_atual"] == "Cadastrar":
-    if st.button("⬅️ Voltar para o Início"):
-        st.session_state["edit_index"] = None
-        st.session_state["pagina_atual"] = "Início"
-        st.rerun()
-        
+    col_voltar, col_t = st.columns([1, 5])
+    with col_voltar:
+        if st.button("← VOLTAR"):
+            st.session_state["edit_index"] = None
+            st.session_state["pagina_atual"] = "Home"
+            st.rerun()
+            
     is_editing = st.session_state["edit_index"] is not None
     
-    if is_editing:
-        st.subheader(f"✏️ Editando Produto: {st.session_state['produtos'][st.session_state['edit_index']]['nome']}")
-        prod_edit = st.session_state["produtos"][st.session_state["edit_index"]]
-    else:
-        st.subheader("➕ Novo Cadastro de Produto")
-        prod_edit = {
-            "codigo": "",
-            "nome": "",
-            "categoria": "Decoração",
-            "tempo": 0.0,
-            "material": 0.0,
-            "margem": 100.0,
-            "imagem": None
-        }
+    with col_t:
+        titulo_pg = "Editar Produto" if is_editing else "Cadastrar Novo Produto"
+        st.markdown(f"<h2 style='color: #1A3644; margin: 0;'>{titulo_pg}</h2>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    
+    prod_edit = st.session_state["produtos"][st.session_state["edit_index"]] if is_editing else {
+        "codigo": "", "nome": "", "categoria": "Decoração",
+        "tempo": 0.0, "material": 0.0, "margem": 100.0, "imagem": None
+    }
 
     col_f1, col_f2 = st.columns(2)
     
@@ -232,53 +279,35 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
         if not is_editing:
             prefixo_atual = prefixos_categorias.get(categoria, "PRD")
             produtos_mesma_cat = [p for p in st.session_state["produtos"] if p.get("categoria") == categoria]
-            proximo_num = len(produtos_mesma_cat) + 1
-            codigo_sugerido = f"{prefixo_atual}-{proximo_num:03d}"
+            codigo_sugerido = f"{prefixo_atual}-{len(produtos_mesma_cat) + 1:03d}"
         else:
             codigo_sugerido = str(prod_edit.get("codigo", ""))
 
-        codigo = st.text_input("Código do Produto (SKU Automático)", value=codigo_sugerido, disabled=True)
+        codigo = st.text_input("Código SKU", value=codigo_sugerido, disabled=True)
         nome = st.text_input("Nome do Produto", value=str(prod_edit.get("nome", "")))
         
     with col_f2:
-        tempo_impressao = st.number_input("Tempo de Impressão (em horas)", min_value=0.0, step=0.5, value=float(prod_edit.get("tempo", 0.0)))
-        material_uso = st.number_input("Material Usado (em gramas)", min_value=0.0, step=1.0, value=float(prod_edit.get("material", 0.0)))
-        margem_desejada = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, step=10.0, value=float(prod_edit.get("margem", 100.0)))
+        tempo_impressao = st.number_input("Tempo de Impressão (Horas)", min_value=0.0, step=0.5, value=float(prod_edit.get("tempo", 0.0)))
+        material_uso = st.number_input("Material Utilizado (Gramas)", min_value=0.0, step=1.0, value=float(prod_edit.get("material", 0.0)))
+        margem_desejada = st.number_input("Margem de Lucro (%)", min_value=0.0, step=10.0, value=float(prod_edit.get("margem", 100.0)))
 
-    st.markdown("---")
-    foto_produto = st.file_uploader("📸 Tirar foto ou carregar imagem do produto", type=["jpg", "jpeg", "png"])
+    foto_produto = st.file_uploader("Carregar Imagem / Foto do Produto", type=["jpg", "jpeg", "png"])
     
-    img_atual = prod_edit.get("imagem")
-    if is_editing and img_atual and isinstance(img_atual, str) and os.path.exists(img_atual):
-        st.write("Imagem atual:")
-        st.image(img_atual, width=150)
-
-    st.markdown("")
-    btn_texto = "Salvar Alterações" if is_editing else "Cadastrar Produto"
-    
-    if st.button(btn_texto, type="primary"):
+    if st.button("Salvar Produto", use_container_width=True):
         if not nome:
-            st.error("Por favor, preencha pelo menos o Nome do produto.")
+            st.error("Por favor, preencha o Nome do produto.")
         else:
             try:
-                custo_material = material_uso * custo_filamento_g
-                custo_tempo = tempo_impressao * custo_hora_maquina
-                preco_producao = custo_material + custo_tempo
-                
+                preco_producao = (material_uso * custo_filamento_g) + (tempo_impressao * custo_hora_maquina)
                 valor_lucro = preco_producao * (margem_desejada / 100)
                 preco_venda = preco_producao + valor_lucro
                 
                 caminho_imagem_salva = prod_edit.get("imagem", None)
                 if foto_produto is not None:
-                    try:
-                        nome_limpo = "".join(c for c in foto_produto.name if c.isalnum() or c in ('.', '_', '-'))
-                        nome_arquivo = f"{codigo_sugerido.replace('-', '_')}_{nome_limpo}"
-                        caminho_imagem_salva = os.path.join(PASTA_IMAGENS, nome_arquivo)
-                        
-                        with open(caminho_imagem_salva, "wb") as f:
-                            f.write(foto_produto.getbuffer())
-                    except Exception as img_err:
-                        st.warning(f"Aviso: Não foi possível salvar a imagem ({img_err}), mas o produto será salvo.")
+                    nome_limpo = "".join(c for c in foto_produto.name if c.isalnum() or c in ('.', '_', '-'))
+                    caminho_imagem_salva = os.path.join(PASTA_IMAGENS, f"{codigo_sugerido.replace('-', '_')}_{nome_limpo}")
+                    with open(caminho_imagem_salva, "wb") as f:
+                        f.write(foto_produto.getbuffer())
 
                 produto_dados = {
                     "codigo": codigo_sugerido,
@@ -300,70 +329,49 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                     st.session_state["produtos"].append(produto_dados)
                 
                 salvar_dados(st.session_state["produtos"])
-                
-                st.success("Produto guardado com sucesso!")
-                st.session_state["pagina_atual"] = "Início"
+                st.success("Produto salvo com sucesso!")
+                st.session_state["pagina_atual"] = "Produtos"
                 st.rerun()
-                
             except Exception as e:
-                st.error(f"Erro detalhado ao cadastrar: {e}")
-
-    if is_editing:
-        if st.button("❌ Cancelar Edição"):
-            st.session_state["edit_index"] = None
-            st.session_state["pagina_atual"] = "Início"
-            st.rerun()
+                st.error(f"Erro ao salvar: {e}")
 
 # ==========================================
-# PÁGINA 3: ORÇAMENTO (MÚLTIPLOS PRODUTOS)
+# PÁGINA 4: GERAR ORÇAMENTO
 # ==========================================
 elif st.session_state["pagina_atual"] == "Orcamento":
-    if st.button("⬅️ Voltar para o Início"):
-        st.session_state["pagina_atual"] = "Início"
-        st.rerun()
-        
-    st.subheader("📑 Calculadora de Orçamento (Múltiplos Produtos)")
+    col_voltar, col_t = st.columns([1, 5])
+    with col_voltar:
+        if st.button("← VOLTAR"):
+            st.session_state["pagina_atual"] = "Home"
+            st.rerun()
+    with col_t:
+        st.markdown("<h2 style='color: #1A3644; margin: 0;'>Gerador de Orçamentos</h2>", unsafe_allow_html=True)
+
+    st.markdown("---")
     
     produtos = st.session_state["produtos"]
-    
     if not produtos:
-        st.warning("Não existem produtos cadastrados para gerar orçamento. Cadastre um produto primeiro.")
+        st.warning("Cadastre produtos antes de gerar um orçamento.")
     else:
         opcoes_produtos = {f"{p.get('codigo')} - {p.get('nome')} (€ {p.get('venda', 0):.2f})": p for p in produtos}
+        produtos_selecionados = st.multiselect("Selecione os Produtos", options=list(opcoes_produtos.keys()))
         
-        produtos_selecionados_nomes = st.multiselect(
-            "Selecione os produtos para o orçamento", 
-            options=list(opcoes_produtos.keys())
-        )
-        
-        if produtos_selecionados_nomes:
-            st.markdown("---")
-            st.markdown("### 🛒 Itens e Quantidades")
-            
+        if produtos_selecionados:
             total_geral = 0.0
-            
-            for nome_op in produtos_selecionados_nomes:
+            st.markdown("### Resumo do Pedido")
+            for nome_op in produtos_selecionados:
                 prod = opcoes_produtos[nome_op]
-                st.markdown(f"**{nome_op}**")
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.write(f"**{prod.get('nome')}** ({prod.get('codigo')})")
+                with col2:
+                    qtd = st.number_input(f"Qtd", min_value=1, value=1, key=f"q_{prod.get('codigo')}")
+                with col3:
+                    desc = st.number_input(f"Desc (%)", min_value=0.0, max_value=100.0, value=0.0, key=f"d_{prod.get('codigo')}")
                 
-                col_qtd, col_desc = st.columns(2)
-                with col_qtd:
-                    qtd = st.number_input(f"Quantidade", min_value=1, value=1, step=1, key=f"qtd_{prod.get('codigo')}")
-                with col_desc:
-                    desc = st.number_input(f"Desconto (%)", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key=f"desc_{prod.get('codigo')}")
-                
-                preco_unit = float(prod.get('venda', 0))
-                subtotal_item = preco_unit * qtd
-                valor_desconto_item = subtotal_item * (desc / 100)
-                total_item = subtotal_item - valor_desconto_item
-                
-                total_geral += total_item
-                st.write(f"Subtotal do item: **€ {total_item:.2f}**")
+                subtotal = (float(prod.get('venda', 0)) * qtd) * (1 - (desc / 100))
+                total_geral += subtotal
+                st.write(f"Subtotal: **€ {subtotal:.2f}**")
                 st.markdown("---")
                 
-            st.markdown(f"## 💰 **Valor Total do Orçamento: € {total_geral:.2f}**")
-            
-            if st.button("🖨️ Finalizar / Copiar Resumo do Orçamento", type="primary"):
-                st.success("Orçamento global calculado com sucesso! Pronto para enviar ao cliente.")
-        else:
-            st.info("Selecione um ou mais produtos acima para começar a montar o orçamento.")
+            st.markdown(f"## **Total Final: € {total_geral:.2f}**")

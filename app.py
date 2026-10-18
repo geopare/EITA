@@ -4,41 +4,27 @@ import os
 
 st.set_page_config(page_title="Gestão Impressão 3D", page_icon="🖨️", layout="wide")
 
-# ==========================================
-# CONFIGURAÇÃO DO GOOGLE SHEETS
-# ==========================================
-SPREADSHEET_ID = "1cZNolJG7_LWXlC_nVdXif_l-kHYfmYlD_FvJcpDE1dI"
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv"
-
-ARQUIVO_LOCAL = "produtos_3d.csv"
+ARQUIVO_DADOS = "produtos_3d.csv"
 PASTA_IMAGENS = "imagens"
 
 if not os.path.exists(PASTA_IMAGENS):
     os.makedirs(PASTA_IMAGENS)
 
-# Função para carregar os produtos do Google Sheets (com fallback local)
+# Função para carregar os produtos do arquivo local
 def carregar_dados():
-    if SPREADSHEET_ID != "":
+    if os.path.exists(ARQUIVO_DADOS):
         try:
-            df = pd.read_csv(SHEET_URL)
-            df = df.dropna(how="all")
-            return df.to_dict("records")
-        except Exception:
-            pass
-            
-    if os.path.exists(ARQUIVO_LOCAL):
-        try:
-            df = pd.read_csv(ARQUIVO_LOCAL)
+            df = pd.read_csv(ARQUIVO_DADOS)
             return df.to_dict("records")
         except Exception:
             return []
     return []
 
-# Função para salvar a lista de produtos localmente e na sessão
+# Função para salvar a lista de produtos no arquivo local
 def salvar_dados(produtos_lista):
     try:
         df = pd.DataFrame(produtos_lista)
-        df.to_csv(ARQUIVO_LOCAL, index=False)
+        df.to_csv(ARQUIVO_DADOS, index=False)
     except Exception as e:
         st.error(f"Erro ao salvar dados localmente: {e}")
 
@@ -52,7 +38,7 @@ if "edit_index" not in st.session_state:
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "Início"
 
-# Custos padrão ajustados para a Alemanha (Filamento a 14€/kg = 0.014€/g, Hora de Máquina/Energia approx. 1.00€/h)
+# Custos padrão ajustados para a Alemanha
 if "custo_filamento_g" not in st.session_state:
     st.session_state["custo_filamento_g"] = 0.014
 if "custo_hora_maquina" not in st.session_state:
@@ -79,7 +65,7 @@ prefixos_categorias = {
 }
 
 # ==========================================
-# BARRA LATERAL (MENU E CONFIGURAÇÕES)
+# BARRA LATERAL (MENU E BACKUP)
 # ==========================================
 with st.sidebar:
     if os.path.exists("logo.png"):
@@ -109,10 +95,31 @@ with st.sidebar:
     st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (€/h)", min_value=0.0, value=custo_hora_maquina, step=0.10, format="%.2f")
 
     st.markdown("---")
-    if st.button("🔄 Recarregar do Google Sheets"):
-        st.session_state["produtos"] = carregar_dados()
-        st.success("Dados recarregados da planilha!")
-        st.rerun()
+    st.header("💾 Backup e Segurança")
+    
+    # Exportar/Baixar catálogo atual em CSV
+    if st.session_state["produtos"]:
+        df_export = pd.DataFrame(st.session_state["produtos"])
+        csv_data = df_export.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Baixar Backup dos Produtos",
+            data=csv_data,
+            file_name="produtos_3d_backup.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    
+    # Importar backup salvo anteriormente
+    arquivo_backup = st.file_uploader("📤 Restaurar Backup (CSV)", type=["csv"])
+    if arquivo_backup is not None:
+        try:
+            df_import = pd.read_csv(arquivo_backup)
+            st.session_state["produtos"] = df_import.to_dict("records")
+            salvar_dados(st.session_state["produtos"])
+            st.success("Backup restaurado com sucesso!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao carregar backup: {e}")
 
 # ==========================================
 # PÁGINA 1: INÍCIO (PAINEL ORGANIZADO)
@@ -357,6 +364,6 @@ elif st.session_state["pagina_atual"] == "Orcamento":
             st.markdown(f"## 💰 **Valor Total do Orçamento: € {total_geral:.2f}**")
             
             if st.button("🖨️ Finalizar / Copiar Resumo do Orçamento", type="primary"):
-                st.success("Orçamento global calculated com sucesso! Pronto para enviar ao cliente.")
+                st.success("Orçamento global calculado com sucesso! Pronto para enviar ao cliente.")
         else:
             st.info("Selecione um ou mais produtos acima para começar a montar o orçamento.")

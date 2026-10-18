@@ -7,7 +7,7 @@ st.set_page_config(
     page_title="EITA - Ateliê de Ideias", 
     page_icon="💡", 
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # Estilização CSS personalizada
@@ -17,9 +17,6 @@ st.markdown("""
     .main {
         background-color: #FFFFFF;
     }
-    
-    /* Esconder cabeçalho padrão do Streamlit */
-    header {visibility: hidden;}
     
     /* Cor padrão (#1A3644) para todos os textos */
     html, body, [class*="css"], p, span, label, h1, h2, h3, h4, h5, h6, div {
@@ -136,9 +133,7 @@ prefixos_categorias = {
     "Natal": "NAT", "Religiao": "REL", "Outros": "OUT",
 }
 
-# ==========================================
-# VERIFICAÇÃO E CARREGAMENTO DAS LOGOS
-# ==========================================
+# Verificação das Logos
 caminho_logo = None
 for p in ["logo.png", "imagens/logo.png", "logo.jpg"]:
     if os.path.exists(p):
@@ -154,7 +149,6 @@ for p in ["logo2.png", "imagens/logo2.png", "logo2.jpg"]:
 if not caminho_logo2:
     caminho_logo2 = caminho_logo
 
-# Função para renderizar o cabeçalho padronizado
 def renderizar_cabecalho(titulo_pagina):
     col_cabecalho, col_voltar = st.columns([5, 1])
     with col_cabecalho:
@@ -186,11 +180,39 @@ def renderizar_cabecalho(titulo_pagina):
             st.session_state["pagina_atual"] = "Home"
             st.rerun()
 
+def renderizar_painel_backup():
+    with st.expander("💾 Gestão de Backup (Baixar / Restaurar Produtos)", expanded=False):
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            if st.session_state["produtos"]:
+                df_export = pd.DataFrame(st.session_state["produtos"])
+                csv_data = df_export.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Baixar Backup (CSV)",
+                    data=csv_data,
+                    file_name="produtos_3d.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            else:
+                st.info("Nenhum produto cadastrado para exportar.")
+        with col_b2:
+            arquivo_backup = st.file_uploader("📤 Restaurar Backup (CSV)", type=["csv"], key="uploader_backup_geral")
+            if arquivo_backup is not None:
+                try:
+                    df_import = pd.read_csv(arquivo_backup)
+                    st.session_state["produtos"] = df_import.to_dict("records")
+                    salvar_dados(st.session_state["produtos"])
+                    st.success("Backup restaurado com sucesso!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao carregar backup: {e}")
+
 # ==========================================
-# BARRA LATERAL (MENU SECUNDÁRIO E BACKUP)
+# BARRA LATERAL (CONFIGURAÇÕES)
 # ==========================================
 with st.sidebar:
-    st.title("⚙️ Configurações & Backup")
+    st.title("⚙️ Configurações Base")
     
     if st.button("🏠 Ir para a Tela Inicial", use_container_width=True):
         st.session_state["pagina_atual"] = "Home"
@@ -202,32 +224,8 @@ with st.sidebar:
     st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (€/g)", min_value=0.0, value=float(st.session_state["custo_filamento_g"]), step=0.001, format="%.3f", key="side_filamento")
     st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (€/h)", min_value=0.0, value=float(st.session_state["custo_hora_maquina"]), step=0.10, format="%.2f", key="side_maquina")
 
-    st.markdown("---")
-    st.subheader("💾 Gestão de Backup")
-    if st.session_state["produtos"]:
-        df_export = pd.DataFrame(st.session_state["produtos"])
-        csv_data = df_export.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Baixar Backup (CSV)",
-            data=csv_data,
-            file_name="produtos_3d_backup.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    
-    arquivo_backup = st.file_uploader("📤 Restaurar Backup (CSV)", type=["csv"])
-    if arquivo_backup is not None:
-        try:
-            df_import = pd.read_csv(arquivo_backup)
-            st.session_state["produtos"] = df_import.to_dict("records")
-            salvar_dados(st.session_state["produtos"])
-            st.success("Backup restaurado!")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao carregar backup: {e}")
-
 # ==========================================
-# PÁGINA INICIAL: CLEAN / DESIGN MINIMALISTA
+# PÁGINA INICIAL: CLEAN
 # ==========================================
 if st.session_state["pagina_atual"] == "Home":
     
@@ -263,6 +261,9 @@ if st.session_state["pagina_atual"] == "Home":
         if st.button("ORCAMENTO", use_container_width=True):
             st.session_state["pagina_atual"] = "Orcamento"
             st.rerun()
+            
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    renderizar_painel_backup()
 
 # ==========================================
 # PÁGINA 2: CATÁLOGO DE PRODUTOS
@@ -323,6 +324,9 @@ elif st.session_state["pagina_atual"] == "Produtos":
                                 st.session_state["produtos"].pop(idx_global)
                                 salvar_dados(st.session_state["produtos"])
                                 st.rerun()
+                                
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    renderizar_painel_backup()
 
 # ==========================================
 # PÁGINA 3: CADASTRAR / EDITAR PRODUTO
@@ -432,7 +436,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 st.error(f"Erro ao salvar: {e}")
 
 # ==========================================
-# PÁGINA 4: GERADOR DE ORÇAMENTOS (MÚLTIPLOS ITENS E QUANTIDADES)
+# PÁGINA 4: GERADOR DE ORÇAMENTOS
 # ==========================================
 elif st.session_state["pagina_atual"] == "Orcamento":
     
@@ -442,9 +446,8 @@ elif st.session_state["pagina_atual"] == "Orcamento":
     produtos = st.session_state["produtos"]
     
     if not produtos:
-        st.warning("Ainda não há produtos cadastrados. Cadastre produtos no catálogo para montar orçamentos.")
+        st.warning("Ainda não há produtos cadastrados.")
     else:
-        # Criar dicionário de seleção formatado
         opcoes_produtos = {
             f"{p.get('codigo', 'SKU')} — {p.get('nome', 'Produto')} (€ {p.get('venda', 0):.2f})": p 
             for p in produtos
@@ -452,8 +455,7 @@ elif st.session_state["pagina_atual"] == "Orcamento":
         
         produtos_selecionados_chaves = st.multiselect(
             "🛒 Selecione os Produtos para o Orçamento", 
-            options=list(opcoes_produtos.keys()),
-            help="Pode escolher um ou múltiplos produtos do seu catálogo."
+            options=list(opcoes_produtos.keys())
         )
         
         if produtos_selecionados_chaves:
@@ -500,7 +502,6 @@ elif st.session_state["pagina_atual"] == "Orcamento":
                         st.markdown("<br>", unsafe_allow_html=True)
                         st.markdown(f"Subtotal: **€ {subtotal_liquido:.2f}**")
                     
-                    # Formatar linha do resumo para mensagem
                     desc_str = f" (-{desc:.0f}%)" if desc > 0 else ""
                     resumo_texto += f"• *{qtd}x {nome}* ({codigo})\n  € {preco_unit:.2f} un. → *€ {subtotal_liquido:.2f}*{desc_str}\n\n"
 
@@ -509,8 +510,5 @@ elif st.session_state["pagina_atual"] == "Orcamento":
             st.markdown("---")
             st.markdown(f"<h2 style='color: #1A3644;'>💰 Total Geral: € {total_orcamento:.2f}</h2>", unsafe_allow_html=True)
             
-            # Caixa com o texto pronto para copiar
             with st.expander("📄 Ver Resumo Formatado para Enviar ao Cliente"):
                 st.code(resumo_texto, language="text")
-        else:
-            st.info("Selecione um ou mais produtos no campo acima para começar a montar o orçamento.")

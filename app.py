@@ -18,16 +18,16 @@ st.markdown("""
         background-color: #FFFFFF;
     }
     
-    /* Cor padrão (#103b57) para todos os textos */
+    /* Cor padrão (#1A3644) para todos os textos */
     html, body, [class*="css"], p, span, label, h1, h2, h3, h4, h5, h6, div {
-        color: #103b57 !important;
+        color: #1A3644 !important;
     }
     
     /* Botões minimalistas */
     div.stButton > button {
         border: none;
         background-color: transparent;
-        color: #103b57 !important;
+        color: #1A3644 !important;
         font-weight: 600;
         font-size: 15px;
         letter-spacing: 1.5px;
@@ -43,7 +43,7 @@ st.markdown("""
     
     /* Títulos de Categorias no Catálogo */
     .categoria-titulo {
-        color: #103b57 !important;
+        color: #1A3644 !important;
         font-size: 22px;
         font-weight: 700;
         margin-top: 25px;
@@ -63,7 +63,7 @@ st.markdown("""
         height: 48px;
     }
     .header-titulo-catalogo {
-        color: #1A3103b57644 !important;
+        color: #1A3644 !important;
         font-size: 32px;
         font-weight: 400;
         margin: 0;
@@ -74,11 +74,11 @@ st.markdown("""
     /* Expander e Inputs */
     .streamlit-expanderHeader {
         font-weight: 600;
-        color: #103b57 !important;
+        color: #1A3644 !important;
     }
     
     .stTextInput input, .stNumberInput input, .stSelectbox div {
-        color: #103b57 !important;
+        color: #1A3644 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -258,16 +258,16 @@ if st.session_state["pagina_atual"] == "Home":
             st.rerun()
             
     with col_m3:
-        if st.button("ORÇAMENTO", use_container_width=True):
+        if st.button("ORCAMENTO", use_container_width=True):
             st.session_state["pagina_atual"] = "Orcamento"
             st.rerun()
 
 # ==========================================
 # PÁGINA 2: CATÁLOGO DE PRODUTOS
 # ==========================================
-elif st.session_state["pagina_atual"] == "PRODUTOS":
+elif st.session_state["pagina_atual"] == "Produtos":
     
-    renderizar_cabecalho("CATÁLOGO DE PRODUTOS")
+    renderizar_cabecalho("catalogo de Produtos")
     st.markdown("---")
     
     produtos = st.session_state["produtos"]
@@ -434,7 +434,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
 # ==========================================
 elif st.session_state["pagina_atual"] == "Orcamento":
     
-    renderizar_cabecalho("ORÇAMENTO")
+    renderizar_cabecalho("Calculadora de Orçamento")
     st.markdown("---")
     
     produtos = st.session_state["produtos"]

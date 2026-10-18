@@ -110,12 +110,26 @@ prefixos_categorias = {
     "Natal": "NAT", "Religiao": "REL", "Outros": "OUT",
 }
 
-# Encontrar caminho da logo
+# ==========================================
+# VERIFICAÇÃO E CARREGAMENTO DAS LOGOS
+# ==========================================
+# Logo Principal da Tela Inicial
 caminho_logo = None
 for p in ["logo.png", "imagens/logo.png", "logo.jpg"]:
     if os.path.exists(p):
         caminho_logo = p
         break
+
+# Logo2 do Cabeçalho do Catálogo
+caminho_logo2 = None
+for p in ["logo2.png", "imagens/logo2.png", "logo2.jpg"]:
+    if os.path.exists(p):
+        caminho_logo2 = p
+        break
+
+# Se logo2 não existir, usa a logo principal como fallback
+if not caminho_logo2:
+    caminho_logo2 = caminho_logo
 
 # ==========================================
 # BARRA LATERAL (MENU SECUNDÁRIO E BACKUP)
@@ -164,7 +178,7 @@ if st.session_state["pagina_atual"] == "Home":
     
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    # Exibição Centralizada da Logo
+    # Exibição Centralizada da Logo Inicial
     col_e, col_centro, col_d = st.columns([1, 2, 1])
     with col_centro:
         if caminho_logo:
@@ -202,12 +216,12 @@ if st.session_state["pagina_atual"] == "Home":
 # ==========================================
 elif st.session_state["pagina_atual"] == "Produtos":
     
-    # Cabeçalho no estilo Logo2: Logo + Divisor + Título + Botão VOLTAr
+    # Cabeçalho no estilo Logo2: Logo2 + Divisor + Título + Botão VOLTAr
     col_logo, col_div, col_titulo, col_voltar = st.columns([2.5, 0.2, 4, 1.5])
     
     with col_logo:
-        if caminho_logo:
-            st.image(caminho_logo, width=220)
+        if caminho_logo2:
+            st.image(caminho_logo2, width=220)
         else:
             st.markdown("<h3 style='color: #1A3644; margin: 0;'>EITA ATELIÊ DE IDEIAS</h3>", unsafe_allow_html=True)
             
@@ -238,7 +252,6 @@ elif st.session_state["pagina_atual"] == "Produtos":
                 st.markdown(f"<div class='categoria-titulo'>{cat}</div>", unsafe_allow_html=True)
                 
                 for i_cat, p in enumerate(prods_cat):
-                    # Encontrar o índice global do produto
                     idx_global = produtos.index(p)
                     
                     with st.expander(f"{p.get('codigo', 'SKU')} — {p.get('nome', 'Sem nome')}"):

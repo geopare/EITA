@@ -9,7 +9,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Estilização CSS personalizada para visual clean / elegante
+# Estilização CSS personalizada para visual clean / elegante e alinhamento do cabeçalho
 st.markdown("""
 <style>
     /* Estilo geral e fundo */
@@ -47,6 +47,13 @@ st.markdown("""
         margin-bottom: 10px;
         border-bottom: 2px solid #C5A059;
         padding-bottom: 5px;
+    }
+    
+    /* Alinhamento vertical perfeito para as colunas do cabeçalho do catálogo */
+    div[data-testid="column"] {
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
     /* Esconder bordas pesadas do expander */
@@ -127,7 +134,6 @@ for p in ["logo2.png", "imagens/logo2.png", "logo2.jpg"]:
         caminho_logo2 = p
         break
 
-# Se logo2 não existir, usa a logo principal como fallback
 if not caminho_logo2:
     caminho_logo2 = caminho_logo
 
@@ -192,7 +198,7 @@ if st.session_state["pagina_atual"] == "Home":
             
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    # Menu Limpo Inferior (PROTUDOS | CADASTRA NOVO PRODUTO | ORCAMENTO)
+    # Menu Limpo Inferior
     col_m1, col_m2, col_m3 = st.columns([1, 1, 1])
     
     with col_m1:
@@ -212,27 +218,26 @@ if st.session_state["pagina_atual"] == "Home":
             st.rerun()
 
 # ==========================================
-# PÁGINA 2: CATÁLOGO DE PRODUTOS (LAYOUT LOGO2)
+# PÁGINA 2: CATÁLOGO DE PRODUTOS (ALINHAMENTO VERTICAL PERFEITO)
 # ==========================================
 elif st.session_state["pagina_atual"] == "Produtos":
     
-    # Cabeçalho no estilo Logo2: Logo2 + Divisor + Título + Botão VOLTAr
+    # Cabeçalho com alinhamento vertical centralizado
     col_logo, col_div, col_titulo, col_voltar = st.columns([2.5, 0.2, 4, 1.5])
     
     with col_logo:
         if caminho_logo2:
-            st.image(caminho_logo2, width=220)
+            st.image(caminho_logo2, width=180)
         else:
             st.markdown("<h3 style='color: #1A3644; margin: 0;'>EITA ATELIÊ DE IDEIAS</h3>", unsafe_allow_html=True)
             
     with col_div:
-        st.markdown("<div style='border-left: 2px solid #C5A059; height: 60px; margin: auto;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='border-left: 2px solid #C5A059; height: 50px; margin: auto;'></div>", unsafe_allow_html=True)
         
     with col_titulo:
-        st.markdown("<h2 style='color: #1A3644; font-weight: 400; margin-top: 10px;'>catalogo de Produtos</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='color: #1A3644; font-weight: 400; margin: 0;'>catalogo de Produtos</h2>", unsafe_allow_html=True)
         
     with col_voltar:
-        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("VOLTAr", use_container_width=True):
             st.session_state["pagina_atual"] = "Home"
             st.rerun()
@@ -244,7 +249,7 @@ elif st.session_state["pagina_atual"] == "Produtos":
     if not produtos:
         st.info("Nenhum produto cadastrado até o momento.")
     else:
-        # Agrupamento de Produtos por Categoria
+        # Agrupamento por Categoria
         for cat in categorias_lista:
             prods_cat = [p for p in produtos if p.get("categoria") == cat]
             

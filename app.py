@@ -55,7 +55,7 @@ st.markdown("""
         padding-bottom: 5px;
     }
     
-    /* Bloco Integrado do Cabeçalho do Catálogo */
+    /* Bloco Integrado do Cabeçalho */
     .header-catalogo-container {
         display: flex;
         align-items: center;
@@ -158,6 +158,38 @@ for p in ["logo2.png", "imagens/logo2.png", "logo2.jpg"]:
 if not caminho_logo2:
     caminho_logo2 = caminho_logo
 
+# Função para renderizar o cabeçalho padronizado
+def renderizar_cabecalho(titulo_pagina):
+    col_cabecalho, col_voltar = st.columns([5, 1])
+    with col_cabecalho:
+        if caminho_logo2:
+            with open(caminho_logo2, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode()
+            html_header = f"""
+            <div class="header-catalogo-container">
+                <img src="data:image/png;base64,{encoded_string}" style="max-height: 55px; width: auto;" />
+                <div class="header-linha-dourada"></div>
+                <h2 class="header-titulo-catalogo">{titulo_pagina}</h2>
+            </div>
+            """
+            st.markdown(html_header, unsafe_allow_html=True)
+        else:
+            html_header = f"""
+            <div class="header-catalogo-container">
+                <h3 style="color: #1A3644; margin: 0;">EITA ATELIÊ DE IDEIAS</h3>
+                <div class="header-linha-dourada"></div>
+                <h2 class="header-titulo-catalogo">{titulo_pagina}</h2>
+            </div>
+            """
+            st.markdown(html_header, unsafe_allow_html=True)
+            
+    with col_voltar:
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        if st.button("VOLTAr", use_container_width=True):
+            st.session_state["edit_index"] = None
+            st.session_state["pagina_atual"] = "Home"
+            st.rerun()
+
 # ==========================================
 # BARRA LATERAL (MENU SECUNDÁRIO E BACKUP)
 # ==========================================
@@ -171,8 +203,8 @@ with st.sidebar:
 
     st.markdown("---")
     st.subheader("💶 Custos Base (Alemanha)")
-    st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (€/g)", min_value=0.0, value=custo_filamento_g, step=0.001, format="%.3f")
-    st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (€/h)", min_value=0.0, value=custo_hora_maquina, step=0.10, format="%.2f")
+    st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (€/g)", min_value=0.0, value=st.session_state["custo_filamento_g"], step=0.001, format="%.3f", key="side_filamento")
+    st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (€/h)", min_value=0.0, value=st.session_state["custo_hora_maquina"], step=0.10, format="%.2f", key="side_maquina")
 
     st.markdown("---")
     st.subheader("💾 Gestão de Backup")
@@ -243,37 +275,7 @@ if st.session_state["pagina_atual"] == "Home":
 # ==========================================
 elif st.session_state["pagina_atual"] == "Produtos":
     
-    col_cabecalho, col_voltar = st.columns([5, 1])
-    
-    with col_cabecalho:
-        if caminho_logo2:
-            with open(caminho_logo2, "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode()
-            
-            html_header = f"""
-            <div class="header-catalogo-container">
-                <img src="data:image/png;base64,{encoded_string}" style="max-height: 55px; width: auto;" />
-                <div class="header-linha-dourada"></div>
-                <h2 class="header-titulo-catalogo">catalogo de Produtos</h2>
-            </div>
-            """
-            st.markdown(html_header, unsafe_allow_html=True)
-        else:
-            html_header = """
-            <div class="header-catalogo-container">
-                <h3 style="color: #1A3644; margin: 0;">EITA ATELIÊ DE IDEIAS</h3>
-                <div class="header-linha-dourada"></div>
-                <h2 class="header-titulo-catalogo">catalogo de Produtos</h2>
-            </div>
-            """
-            st.markdown(html_header, unsafe_allow_html=True)
-            
-    with col_voltar:
-        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-        if st.button("VOLTAr", use_container_width=True):
-            st.session_state["pagina_atual"] = "Home"
-            st.rerun()
-            
+    renderizar_cabecalho("catalogo de Produtos")
     st.markdown("---")
     
     produtos = st.session_state["produtos"]
@@ -329,28 +331,42 @@ elif st.session_state["pagina_atual"] == "Produtos":
                                 st.rerun()
 
 # ==========================================
-# PÁGINA 3: CADASTRAR / EDITAR PRODUTO
+# PÁGINA 3: CADASTRAR / EDITAR PRODUTO (MESMO DESIGN DO CATÁLOGO)
 # ==========================================
 elif st.session_state["pagina_atual"] == "Cadastrar":
-    col_voltar, col_t = st.columns([1.5, 5])
-    with col_voltar:
-        if st.button("VOLTAr"):
-            st.session_state["edit_index"] = None
-            st.session_state["pagina_atual"] = "Home"
-            st.rerun()
-            
-    is_editing = st.session_state["edit_index"] is not None
     
-    with col_t:
-        titulo_pg = "Editar Produto" if is_editing else "Cadastrar Novo Produto"
-        st.markdown(f"<h2 style='color: #1A3644; margin: 0;'>{titulo_pg}</h2>", unsafe_allow_html=True)
-
+    is_editing = st.session_state["edit_index"] is not None
+    titulo_pg = "Editar Produto" if is_editing else "Cadastro de Produto"
+    
+    renderizar_cabecalho(titulo_pg)
     st.markdown("---")
     
     prod_edit = st.session_state["produtos"][st.session_state["edit_index"]] if is_editing else {
         "codigo": "", "nome": "", "categoria": "Decoração",
         "tempo": 0.0, "material": 0.0, "margem": 100.0, "imagem": None
     }
+
+    # Seção de Ajuste dos Custos Base (Máquina e Filamento)
+    with st.expander("⚙️ Ajustar Custos Base de Cálculo (€)", expanded=False):
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            st.session_state["custo_filamento_g"] = st.number_input(
+                "Custo Filamento (€/g)", 
+                min_value=0.0, 
+                value=float(st.session_state["custo_filamento_g"]), 
+                step=0.001, 
+                format="%.3f",
+                key="input_custo_fil"
+            )
+        with col_c2:
+            st.session_state["custo_hora_maquina"] = st.number_input(
+                "Custo Hora Máquina (€/h)", 
+                min_value=0.0, 
+                value=float(st.session_state["custo_hora_maquina"]), 
+                step=0.10, 
+                format="%.2f",
+                key="input_custo_maq"
+            )
 
     col_f1, col_f2 = st.columns(2)
     
@@ -376,12 +392,16 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
 
     foto_produto = st.file_uploader("Carregar Imagem / Foto do Produto", type=["jpg", "jpeg", "png"])
     
+    st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Salvar Produto", use_container_width=True):
         if not nome:
             st.error("Por favor, preencha o Nome do produto.")
         else:
             try:
-                preco_producao = (material_uso * custo_filamento_g) + (tempo_impressao * custo_hora_maquina)
+                c_fil = st.session_state["custo_filamento_g"]
+                c_maq = st.session_state["custo_hora_maquina"]
+                
+                preco_producao = (material_uso * c_fil) + (tempo_impressao * c_maq)
                 valor_lucro = preco_producao * (margem_desejada / 100)
                 preco_venda = preco_producao + valor_lucro
                 
@@ -422,14 +442,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
 # PÁGINA 4: GERAR ORÇAMENTO
 # ==========================================
 elif st.session_state["pagina_atual"] == "Orcamento":
-    col_voltar, col_t = st.columns([1.5, 5])
-    with col_voltar:
-        if st.button("VOLTAr"):
-            st.session_state["pagina_atual"] = "Home"
-            st.rerun()
-    with col_t:
-        st.markdown("<h2 style='color: #1A3644; margin: 0;'>Gerador de Orçamentos</h2>", unsafe_allow_html=True)
-
+    renderizar_cabecalho("Gerador de Orçamentos")
     st.markdown("---")
     
     produtos = st.session_state["produtos"]

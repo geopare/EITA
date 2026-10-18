@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Estilização CSS personalizada com a cor exata da logo (#1A3644) em todos os textos
+# Estilização CSS personalizada
 st.markdown("""
 <style>
     /* Estilo geral e fundo */
@@ -21,12 +21,12 @@ st.markdown("""
     /* Esconder cabeçalho padrão do Streamlit */
     header {visibility: hidden;}
     
-    /* Cor padrão (#1A3644) para todos os textos, parágrafos, labels e marcadores */
+    /* Cor padrão (#1A3644) para todos os textos */
     html, body, [class*="css"], p, span, label, h1, h2, h3, h4, h5, h6, div {
         color: #1A3644 !important;
     }
     
-    /* Botões minimalistas no menu e navegação */
+    /* Botões minimalistas */
     div.stButton > button {
         border: none;
         background-color: transparent;
@@ -74,13 +74,12 @@ st.markdown("""
         line-height: 1;
     }
     
-    /* Personalização de acionadores/expansores */
+    /* Expander e Inputs */
     .streamlit-expanderHeader {
         font-weight: 600;
         color: #1A3644 !important;
     }
     
-    /* Ajustes em inputs e seletores */
     .stTextInput input, .stNumberInput input, .stSelectbox div {
         color: #1A3644 !important;
     }
@@ -125,9 +124,6 @@ if "custo_filamento_g" not in st.session_state:
     st.session_state["custo_filamento_g"] = 0.014
 if "custo_hora_maquina" not in st.session_state:
     st.session_state["custo_hora_maquina"] = 1.00
-
-custo_filamento_g = st.session_state["custo_filamento_g"]
-custo_hora_maquina = st.session_state["custo_hora_maquina"]
 
 categorias_lista = [
     "Decoração", "Utilitários", "Miniaturas", "Laços", 
@@ -203,8 +199,8 @@ with st.sidebar:
 
     st.markdown("---")
     st.subheader("💶 Custos Base (Alemanha)")
-    st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (€/g)", min_value=0.0, value=st.session_state["custo_filamento_g"], step=0.001, format="%.3f", key="side_filamento")
-    st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (€/h)", min_value=0.0, value=st.session_state["custo_hora_maquina"], step=0.10, format="%.2f", key="side_maquina")
+    st.session_state["custo_filamento_g"] = st.number_input("Custo Filamento (€/g)", min_value=0.0, value=float(st.session_state["custo_filamento_g"]), step=0.001, format="%.3f", key="side_filamento")
+    st.session_state["custo_hora_maquina"] = st.number_input("Custo Hora Máquina (€/h)", min_value=0.0, value=float(st.session_state["custo_hora_maquina"]), step=0.10, format="%.2f", key="side_maquina")
 
     st.markdown("---")
     st.subheader("💾 Gestão de Backup")
@@ -237,7 +233,6 @@ if st.session_state["pagina_atual"] == "Home":
     
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    # Exibição Centralizada da Logo Inicial
     col_e, col_centro, col_d = st.columns([1, 2, 1])
     with col_centro:
         if caminho_logo:
@@ -251,7 +246,6 @@ if st.session_state["pagina_atual"] == "Home":
             
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    # Menu Limpo Inferior
     col_m1, col_m2, col_m3 = st.columns([1, 1, 1])
     
     with col_m1:
@@ -331,7 +325,7 @@ elif st.session_state["pagina_atual"] == "Produtos":
                                 st.rerun()
 
 # ==========================================
-# PÁGINA 3: CADASTRAR / EDITAR PRODUTO (MESMO DESIGN DO CATÁLOGO)
+# PÁGINA 3: CADASTRAR / EDITAR PRODUTO
 # ==========================================
 elif st.session_state["pagina_atual"] == "Cadastrar":
     
@@ -346,7 +340,6 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
         "tempo": 0.0, "material": 0.0, "margem": 100.0, "imagem": None
     }
 
-    # Seção de Ajuste dos Custos Base (Máquina e Filamento)
     with st.expander("⚙️ Ajustar Custos Base de Cálculo (€)", expanded=False):
         col_c1, col_c2 = st.columns(2)
         with col_c1:
@@ -439,35 +432,85 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 st.error(f"Erro ao salvar: {e}")
 
 # ==========================================
-# PÁGINA 4: GERAR ORÇAMENTO
+# PÁGINA 4: GERADOR DE ORÇAMENTOS (MÚLTIPLOS ITENS E QUANTIDADES)
 # ==========================================
 elif st.session_state["pagina_atual"] == "Orcamento":
-    renderizar_cabecalho("Gerador de Orçamentos")
+    
+    renderizar_cabecalho("Calculadora de Orçamento")
     st.markdown("---")
     
     produtos = st.session_state["produtos"]
+    
     if not produtos:
-        st.warning("Cadastre produtos antes de gerar um orçamento.")
+        st.warning("Ainda não há produtos cadastrados. Cadastre produtos no catálogo para montar orçamentos.")
     else:
-        opcoes_produtos = {f"{p.get('codigo')} - {p.get('nome')} (€ {p.get('venda', 0):.2f})": p for p in produtos}
-        produtos_selecionados = st.multiselect("Selecione os Produtos", options=list(opcoes_produtos.keys()))
+        # Criar dicionário de seleção formatado
+        opcoes_produtos = {
+            f"{p.get('codigo', 'SKU')} — {p.get('nome', 'Produto')} (€ {p.get('venda', 0):.2f})": p 
+            for p in produtos
+        }
         
-        if produtos_selecionados:
-            total_geral = 0.0
-            st.markdown("### Resumo do Pedido")
-            for nome_op in produtos_selecionados:
-                prod = opcoes_produtos[nome_op]
-                col1, col2, col3 = st.columns([2, 1, 1])
-                with col1:
-                    st.write(f"**{prod.get('nome')}** ({prod.get('codigo')})")
-                with col2:
-                    qtd = st.number_input(f"Qtd", min_value=1, value=1, key=f"q_{prod.get('codigo')}")
-                with col3:
-                    desc = st.number_input(f"Desc (%)", min_value=0.0, max_value=100.0, value=0.0, key=f"d_{prod.get('codigo')}")
+        produtos_selecionados_chaves = st.multiselect(
+            "🛒 Selecione os Produtos para o Orçamento", 
+            options=list(opcoes_produtos.keys()),
+            help="Pode escolher um ou múltiplos produtos do seu catálogo."
+        )
+        
+        if produtos_selecionados_chaves:
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("<h3 style='color: #1A3644;'>📦 Detalhes e Quantidades</h3>", unsafe_allow_html=True)
+            
+            total_orcamento = 0.0
+            resumo_texto = "📋 *ORÇAMENTO — EITA ATELIÊ DE IDEIAS*\n\n"
+            
+            for i_item, chave in enumerate(produtos_selecionados_chaves):
+                prod = opcoes_produtos[chave]
+                codigo = prod.get('codigo', '')
+                nome = prod.get('nome', '')
+                preco_unit = float(prod.get('venda', 0))
                 
-                subtotal = (float(prod.get('venda', 0)) * qtd) * (1 - (desc / 100))
-                total_geral += subtotal
-                st.write(f"Subtotal: **€ {subtotal:.2f}**")
-                st.markdown("---")
-                
-            st.markdown(f"## **Total Final: € {total_geral:.2f}**")
+                with st.expander(f"🔹 {codigo} — {nome} (€ {preco_unit:.2f}/unid)", expanded=True):
+                    col_qtd, col_desc, col_total_item = st.columns([1.5, 1.5, 2])
+                    
+                    with col_qtd:
+                        qtd = st.number_input(
+                            f"Quantidade", 
+                            min_value=1, 
+                            value=1, 
+                            step=1, 
+                            key=f"orc_qtd_{codigo}_{i_item}"
+                        )
+                        
+                    with col_desc:
+                        desc = st.number_input(
+                            f"Desconto (%)", 
+                            min_value=0.0, 
+                            max_value=100.0, 
+                            value=0.0, 
+                            step=5.0, 
+                            key=f"orc_desc_{codigo}_{i_item}"
+                        )
+                        
+                    subtotal_bruto = preco_unit * qtd
+                    desconto_val = subtotal_bruto * (desc / 100)
+                    subtotal_liquido = subtotal_bruto - desconto_val
+                    total_orcamento += subtotal_liquido
+                    
+                    with col_total_item:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        st.markdown(f"Subtotal: **€ {subtotal_liquido:.2f}**")
+                    
+                    # Formatar linha do resumo para mensagem
+                    desc_str = f" (-{desc:.0f}%)" if desc > 0 else ""
+                    resumo_texto += f"• *{qtd}x {nome}* ({codigo})\n  € {preco_unit:.2f} un. → *€ {subtotal_liquido:.2f}*{desc_str}\n\n"
+
+            resumo_texto += f"-----------------------------\n💰 *TOTAL DO ORÇAMENTO: € {total_orcamento:.2f}*"
+
+            st.markdown("---")
+            st.markdown(f"<h2 style='color: #1A3644;'>💰 Total Geral: € {total_orcamento:.2f}</h2>", unsafe_allow_html=True)
+            
+            # Caixa com o texto pronto para copiar
+            with st.expander("📄 Ver Resumo Formatado para Enviar ao Cliente"):
+                st.code(resumo_texto, language="text")
+        else:
+            st.info("Selecione um ou mais produtos no campo acima para começar a montar o orçamento.")

@@ -11,20 +11,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização CSS personalizada com a cor (#103b57) em todos os textos
+# Estilização CSS personalizada
 st.markdown("""
 <style>
-    /* Estilo geral e fundo */
-    .main {
-        background-color: #FFFFFF;
-    }
-    
-    /* Cor padrão (#103b57) para todos os textos */
-    html, body, [class*="css"], p, span, label, h1, h2, h3, h4, h5, h6, div {
-        color: #103b57 !important;
-    }
-    
-    /* Botões minimalistas */
+    .main { background-color: #FFFFFF; }
+    html, body, [class*="css"], p, span, label, h1, h2, h3, h4, h5, h6, div { color: #103b57 !important; }
     div.stButton > button {
         border: none;
         background-color: transparent;
@@ -41,8 +32,6 @@ st.markdown("""
         background-color: #F8F9FA;
         border-radius: 8px;
     }
-    
-    /* Títulos de Categorias no Catálogo */
     .categoria-titulo {
         color: #103b57 !important;
         font-size: 22px;
@@ -52,36 +41,16 @@ st.markdown("""
         border-bottom: 2px solid #C5A059;
         padding-bottom: 5px;
     }
-    
-    /* Bloco Integrado do Cabeçalho */
-    .header-catalogo-container {
-        display: flex;
-        align-items: center;
-        gap: 18px;
-    }
-    .header-linha-dourada {
-        border-left: 2px solid #C5A059;
-        height: 48px;
-    }
+    .header-catalogo-container { display: flex; align-items: center; gap: 18px; }
+    .header-linha-dourada { border-left: 2px solid #C5A059; height: 48px; }
     .header-titulo-catalogo {
         color: #103b57 !important;
         font-size: 32px;
         font-weight: 400;
-        margin: 0;
-        padding: 0;
-        line-height: 1;
-        letter-spacing: 1.5px;
+        margin: 0; padding: 0; line-height: 1; letter-spacing: 1.5px;
     }
-    
-    /* Expander e Inputs */
-    .streamlit-expanderHeader {
-        font-weight: 600;
-        color: #103b57 !important;
-    }
-    
-    .stTextInput input, .stNumberInput input, .stSelectbox div {
-        color: #103b57 !important;
-    }
+    .streamlit-expanderHeader { font-weight: 600; color: #103b57 !important; }
+    .stTextInput input, .stNumberInput input, .stSelectbox div { color: #103b57 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -98,17 +67,20 @@ def salvar_arquivo_no_github(caminho_arquivo, conteudo_bytes, mensagem_commit):
     """Envia/atualiza um arquivo diretamente no repositório GitHub via API."""
     if "GITHUB_TOKEN" in st.secrets and "REPO_NAME" in st.secrets:
         try:
-            token = st.secrets["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"]
-            repo_name = st.secrets["geopare/EITA"]
+            token = st.secrets["GITHUB_TOKEN"]
+            repo_name = st.secrets["REPO_NAME"]
             branch = st.secrets.get("BRANCH", "master")
+            
+            # Garantir barras normais no caminho do arquivo para a API do GitHub
+            caminho_github = caminho_arquivo.replace("\\", "/")
             
             g = Github(token)
             repo = g.get_repo(repo_name)
             
             try:
-                file_github = repo.get_contents(caminho_arquivo, ref=branch)
+                file_github = repo.get_contents(caminho_github, ref=branch)
                 repo.update_file(
-                    path=caminho_arquivo,
+                    path=caminho_github,
                     message=mensagem_commit,
                     content=conteudo_bytes,
                     sha=file_github.sha,
@@ -116,16 +88,18 @@ def salvar_arquivo_no_github(caminho_arquivo, conteudo_bytes, mensagem_commit):
                 )
             except GithubException:
                 repo.create_file(
-                    path=caminho_arquivo,
+                    path=caminho_github,
                     message=mensagem_commit,
                     content=conteudo_bytes,
                     branch=branch
                 )
             return True
         except Exception as e:
-            st.warning(f"Aviso de sincronização GitHub: {e}")
+            st.error(f"Erro na sincronização com o GitHub: {e}")
             return False
-    return False
+    else:
+        st.warning("Segredos do GitHub (GITHUB_TOKEN/REPO_NAME) não configurados no Streamlit Cloud.")
+        return False
 
 def carregar_dados():
     if os.path.exists(ARQUIVO_DADOS):
@@ -145,7 +119,7 @@ def salvar_dados(produtos_lista):
         csv_bytes = df.to_csv(index=False).encode('utf-8')
         salvar_arquivo_no_github(ARQUIVO_DADOS, csv_bytes, "Atualização automática do banco de produtos")
     except Exception as e:
-        st.error(f"Erro ao salvar dados: {e}")
+        st.error(f"Erro ao salvar dados localmente: {e}")
 
 # Sessão
 if "produtos" not in st.session_state:
@@ -453,7 +427,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 caminho_imagem_salva = prod_edit.get("imagem", None)
                 if foto_produto is not None:
                     nome_limpo = "".join(c for c in foto_produto.name if c.isalnum() or c in ('.', '_', '-'))
-                    caminho_imagem_salva = os.path.join(PASTA_IMAGENS, f"{codigo_sugerido.replace('-', '_')}_{nome_limpo}")
+                    caminho_imagem_salva = f"{PASTA_IMAGENS}/{codigo_sugerido.replace('-', '_')}_{nome_limpo}"
                     
                     bytes_foto = foto_produto.getvalue()
                     with open(caminho_imagem_salva, "wb") as f:
@@ -482,7 +456,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                     st.session_state["produtos"].append(produto_dados)
                 
                 salvar_dados(st.session_state["produtos"])
-                st.success("Produto e imagem salvos com sucesso no GitHub!")
+                st.success("Produto e imagem processados!")
                 st.session_state["pagina_atual"] = "Produtos"
                 st.rerun()
             except Exception as e:

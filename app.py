@@ -98,9 +98,9 @@ def salvar_arquivo_no_github(caminho_arquivo, conteudo_bytes, mensagem_commit):
     """Envia/atualiza um arquivo diretamente no repositório GitHub via API."""
     if "GITHUB_TOKEN" in st.secrets and "REPO_NAME" in st.secrets:
         try:
-            token = st.secrets["GITHUB_TOKEN"]
-            repo_name = st.secrets["REPO_NAME"]
-            branch = st.secrets.get("BRANCH", "main")
+            token = st.secrets["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"]
+            repo_name = st.secrets["geopare/EITA"]
+            branch = st.secrets.get("BRANCH", "master")
             
             g = Github(token)
             repo = g.get_repo(repo_name)

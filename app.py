@@ -465,6 +465,11 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                     st.session_state["produtos"].append(produto_dados)
                 
                 salvar_dados(st.session_state["produtos"])
+                
+                # Pausa de 4 segundos para conseguires ler caso apareça algum aviso amarelo ou erro
+                import time
+                time.sleep(4)
+                
                 st.success("Produto processado com sucesso!")
                 st.session_state["pagina_atual"] = "Produtos"
                 st.rerun()

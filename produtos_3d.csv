@@ -1,6 +1,6 @@
 codigo,nome,categoria,tempo,material,producao,margem,venda,lucro,imagem
 DEC-002,Mini Vaso,Decoração,1.1,7.0,1.1980000000000002,100.0,2.3960000000000004,1.1980000000000002,imagens/DEC_002_image.jpg
-DEC-003,Vaso Pequeno,Decoração,1.5,16.0,1.724,100.0,3.448,1.724,imagens/DEC_003_IMG_4033.jpeg
+DEC-003,Vaso Pequeno,Decoração,1.5,16.0,1.724,100.0,3.448,1.724,imagens/DEC_003_image.jpg
 NAT-001,Porta Vela,Natal,3.55,53.0,4.292,100.0,8.584,4.292,imagens/NAT_001_IMG_4031.jpeg
 NAT-002,Rena e Trenó ,Natal,4.0,21.0,4.294,100.0,8.588,4.294,imagens/NAT_002_IMG_4034.jpeg
 DEC-004,Mão,Decoração,2.5,101.0,3.914,100.0,7.827999999999999,3.914,

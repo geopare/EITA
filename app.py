@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import base64
+from github import Github, GithubException
 
 st.set_page_config(
     page_title="EITA - Ateliê de Ideias", 
@@ -90,7 +91,42 @@ PASTA_IMAGENS = "imagens"
 if not os.path.exists(PASTA_IMAGENS):
     os.makedirs(PASTA_IMAGENS)
 
-# Carregar e Salvar Dados
+# ==========================================
+# FUNÇÕES DE INTEGRAÇÃO AUTOMÁTICA COM GITHUB
+# ==========================================
+def salvar_arquivo_no_github(caminho_arquivo, conteudo_bytes, mensagem_commit):
+    """Envia/atualiza um arquivo diretamente no repositório GitHub via API."""
+    if "GITHUB_TOKEN" in st.secrets and "REPO_NAME" in st.secrets:
+        try:
+            token = st.secrets["GITHUB_TOKEN"]
+            repo_name = st.secrets["REPO_NAME"]
+            branch = st.secrets.get("BRANCH", "main")
+            
+            g = Github(token)
+            repo = g.get_repo(repo_name)
+            
+            try:
+                file_github = repo.get_contents(caminho_arquivo, ref=branch)
+                repo.update_file(
+                    path=caminho_arquivo,
+                    message=mensagem_commit,
+                    content=conteudo_bytes,
+                    sha=file_github.sha,
+                    branch=branch
+                )
+            except GithubException:
+                repo.create_file(
+                    path=caminho_arquivo,
+                    message=mensagem_commit,
+                    content=conteudo_bytes,
+                    branch=branch
+                )
+            return True
+        except Exception as e:
+            st.warning(f"Aviso de sincronização GitHub: {e}")
+            return False
+    return False
+
 def carregar_dados():
     if os.path.exists(ARQUIVO_DADOS):
         try:
@@ -104,8 +140,12 @@ def salvar_dados(produtos_lista):
     try:
         df = pd.DataFrame(produtos_lista)
         df.to_csv(ARQUIVO_DADOS, index=False)
+        
+        # Automação: envia o CSV para o GitHub
+        csv_bytes = df.to_csv(index=False).encode('utf-8')
+        salvar_arquivo_no_github(ARQUIVO_DADOS, csv_bytes, "Atualização automática do banco de produtos")
     except Exception as e:
-        st.error(f"Erro ao salvar dados localmente: {e}")
+        st.error(f"Erro ao salvar dados: {e}")
 
 # Sessão
 if "produtos" not in st.session_state:
@@ -117,7 +157,6 @@ if "edit_index" not in st.session_state:
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "Home"
 
-# Custos Alemanha
 if "custo_filamento_g" not in st.session_state:
     st.session_state["custo_filamento_g"] = 0.014
 if "custo_hora_maquina" not in st.session_state:
@@ -150,7 +189,6 @@ for p in ["logo2.png", "imagens/logo2.png", "logo2.jpg"]:
 if not caminho_logo2:
     caminho_logo2 = caminho_logo
 
-# Renderização do cabeçalho
 def renderizar_cabecalho(titulo_pagina, exibir_btn_novo=False):
     col_cabecalho, col_acoes = st.columns([4, 2])
     
@@ -283,7 +321,6 @@ if st.session_state["pagina_atual"] == "Home":
 # ==========================================
 elif st.session_state["pagina_atual"] == "Produtos":
     
-    # Exibe o botão ➕ NOVO ao lado de VOLTAr
     renderizar_cabecalho("PRODUTOS", exibir_btn_novo=True)
     st.markdown("---")
     
@@ -417,8 +454,13 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 if foto_produto is not None:
                     nome_limpo = "".join(c for c in foto_produto.name if c.isalnum() or c in ('.', '_', '-'))
                     caminho_imagem_salva = os.path.join(PASTA_IMAGENS, f"{codigo_sugerido.replace('-', '_')}_{nome_limpo}")
+                    
+                    bytes_foto = foto_produto.getvalue()
                     with open(caminho_imagem_salva, "wb") as f:
-                        f.write(foto_produto.getbuffer())
+                        f.write(bytes_foto)
+                    
+                    # Automação: envia a foto para o repositório no GitHub
+                    salvar_arquivo_no_github(caminho_imagem_salva, bytes_foto, f"Upload de foto para {codigo_sugerido}")
 
                 produto_dados = {
                     "codigo": codigo_sugerido,
@@ -440,7 +482,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                     st.session_state["produtos"].append(produto_dados)
                 
                 salvar_dados(st.session_state["produtos"])
-                st.success("Produto salvo com sucesso!")
+                st.success("Produto e imagem salvos com sucesso no GitHub!")
                 st.session_state["pagina_atual"] = "Produtos"
                 st.rerun()
             except Exception as e:

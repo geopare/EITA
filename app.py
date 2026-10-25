@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import base64
+import time
 from github import Github, GithubException
 
 st.set_page_config(
@@ -71,7 +72,6 @@ def salvar_arquivo_no_github(caminho_arquivo, conteudo_bytes, mensagem_commit):
             repo_name = st.secrets["REPO_NAME"]
             branch = st.secrets.get("BRANCH", "master")
             
-            # Garantir barras normais no caminho do arquivo para a API do GitHub
             caminho_github = caminho_arquivo.replace("\\", "/")
             
             g = Github(token)
@@ -115,7 +115,6 @@ def salvar_dados(produtos_lista):
         df = pd.DataFrame(produtos_lista)
         df.to_csv(ARQUIVO_DADOS, index=False)
         
-        # Automação: envia o CSV para o GitHub
         csv_bytes = df.to_csv(index=False).encode('utf-8')
         salvar_arquivo_no_github(ARQUIVO_DADOS, csv_bytes, "Atualização automática do banco de produtos")
     except Exception as e:
@@ -198,12 +197,12 @@ def renderizar_cabecalho(titulo_pagina, exibir_btn_novo=False):
                     st.session_state["pagina_atual"] = "Cadastrar"
                     st.rerun()
             with btn_col2:
-                if st.button("VOLTAr", use_container_width=True):
+                if st.button("VOLTAR", use_container_width=True):
                     st.session_state["edit_index"] = None
                     st.session_state["pagina_atual"] = "Home"
                     st.rerun()
         else:
-            if st.button("VOLTAr", use_container_width=True):
+            if st.button("VOLTAR", use_container_width=True):
                 st.session_state["edit_index"] = None
                 st.session_state["pagina_atual"] = "Home"
                 st.rerun()
@@ -217,6 +216,10 @@ with st.sidebar:
     if st.button("🏠 Ir para a Tela Inicial", use_container_width=True):
         st.session_state["pagina_atual"] = "Home"
         st.session_state["edit_index"] = None
+        st.rerun()
+
+    if st.button("🧮 Simulador Rápido", use_container_width=True):
+        st.session_state["pagina_atual"] = "Simulador"
         st.rerun()
 
     st.markdown("---")
@@ -272,21 +275,26 @@ if st.session_state["pagina_atual"] == "Home":
             
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    col_m1, col_m2, col_m3 = st.columns([1, 1, 1])
+    col_m1, col_m2, col_m3, col_m4 = st.columns([1, 1, 1, 1])
     
     with col_m1:
-        if st.button("PROTUDOS", use_container_width=True):
+        if st.button("PRODUTOS", use_container_width=True):
             st.session_state["pagina_atual"] = "Produtos"
             st.rerun()
             
     with col_m2:
-        if st.button("CADASTRA NOVO PRODUTO", use_container_width=True):
+        if st.button("CADASTRAR", use_container_width=True):
             st.session_state["edit_index"] = None
             st.session_state["pagina_atual"] = "Cadastrar"
             st.rerun()
-            
+
     with col_m3:
-        if st.button("ORCAMENTO", use_container_width=True):
+        if st.button("SIMULADOR", use_container_width=True):
+            st.session_state["pagina_atual"] = "Simulador"
+            st.rerun()
+            
+    with col_m4:
+        if st.button("ORÇAMENTO", use_container_width=True):
             st.session_state["pagina_atual"] = "Orcamento"
             st.rerun()
 
@@ -412,7 +420,6 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
     foto_produto = st.file_uploader("Carregar Imagem / Foto do Produto", type=["jpg", "jpeg", "png"])
     
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Salvar Produto", use_container_width=True):
         if not nome:
             st.error("Por favor, preencha o Nome do produto.")
@@ -426,67 +433,6 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 preco_venda = preco_producao + valor_lucro
                 
                 caminho_imagem_salva = prod_edit.get("imagem", None)
-                
-                if foto_produto is not None:
-                    nome_limpo = "".join(c for c in foto_produto.name if c.isalnum() or c in ('.', '_', '-'))
-                    caminho_imagem_salva = f"{PASTA_IMAGENS}/{codigo_sugerido.replace('-', '_')}_{nome_limpo}"
-                    
-                    # Ler os bytes da foto carregada
-                    bytes_foto = foto_produto.getvalue()
-                    
-                    # Guardar localmente no ambiente do Streamlit
-                    with open(caminho_imagem_salva, "wb") as f:
-                        f.write(bytes_foto)
-                    
-                    # Enviar explicitamente para o GitHub e testar o retorno
-                    sucesso_gh = salvar_arquivo_no_github(caminho_imagem_salva, bytes_foto, f"Upload de foto para {codigo_sugerido}")
-                    if sucesso_gh:
-                        st.success(f"Foto enviada com sucesso para o GitHub: {caminho_imagem_salva}")
-                    else:
-                        st.warning(f"A imagem foi guardada localmente, mas falhou o envio para o GitHub.")
-
-                produto_dados = {
-                    "codigo": codigo_sugerido,
-                    "nome": nome,
-                    "categoria": categoria,
-                    "tempo": tempo_impressao,
-                    "material": material_uso,
-                    "producao": preco_producao,
-                    "margem": margem_desejada,
-                    "venda": preco_venda,
-                    "lucro": valor_lucro,
-                    "imagem": caminho_imagem_salva
-                }
-                
-                if is_editing:
-                    st.session_state["produtos"][st.session_state["edit_index"]] = produto_dados
-                    st.session_state["edit_index"] = None
-                else:
-                    st.session_state["produtos"].append(produto_dados)
-                
-                salvar_dados(st.session_state["produtos"])
-                
-                # Pausa de 4 segundos para conseguires ler caso apareça algum aviso amarelo ou erro
-                import time
-                time.sleep(4)
-                
-                st.success("Produto processado com sucesso!")
-                st.session_state["pagina_atual"] = "Produtos"
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao salvar: {e}")
-        if not nome:
-            st.error("Por favor, preencha o Nome do produto.")
-        else:
-            try:
-                c_fil = st.session_state["custo_filamento_g"]
-                c_maq = st.session_state["custo_hora_maquina"]
-                
-                preco_producao = (material_uso * c_fil) + (tempo_impressao * c_maq)
-                valor_lucro = preco_producao * (margem_desejada / 100)
-                preco_venda = preco_producao + valor_lucro
-                
-                caminho_imagem_salva = prod_edit.get("imagem", None)
                 if foto_produto is not None:
                     nome_limpo = "".join(c for c in foto_produto.name if c.isalnum() or c in ('.', '_', '-'))
                     caminho_imagem_salva = f"{PASTA_IMAGENS}/{codigo_sugerido.replace('-', '_')}_{nome_limpo}"
@@ -495,7 +441,6 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                     with open(caminho_imagem_salva, "wb") as f:
                         f.write(bytes_foto)
                     
-                    # Automação: envia a foto para o repositório no GitHub
                     salvar_arquivo_no_github(caminho_imagem_salva, bytes_foto, f"Upload de foto para {codigo_sugerido}")
 
                 produto_dados = {
@@ -518,11 +463,79 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                     st.session_state["produtos"].append(produto_dados)
                 
                 salvar_dados(st.session_state["produtos"])
-                st.success("Produto e imagem processados!")
+                st.success("Produto processado com sucesso!")
+                time.sleep(1.5)
                 st.session_state["pagina_atual"] = "Produtos"
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao salvar: {e}")
+
+# ==========================================
+# PÁGINA 5: SIMULADOR RÁPIDO DE PREÇOS
+# ==========================================
+elif st.session_state["pagina_atual"] == "Simulador":
+    
+    renderizar_cabecalho("SIMULADOR RÁPIDO")
+    st.markdown("---")
+    st.markdown("<p style='color: #103b57; font-size: 16px;'>Simule valores, tempos e margens para projetos personalizados ou orçamentos avulsos <b>sem guardar no catálogo</b>.</p>", unsafe_allow_html=True)
+    
+    with st.expander("⚙️ Custos Base Atuais (€)", expanded=False):
+        col_sc1, col_sc2 = st.columns(2)
+        with col_sc1:
+            st.session_state["custo_filamento_g"] = st.number_input(
+                "Custo Filamento (€/g)", 
+                min_value=0.0, 
+                value=float(st.session_state["custo_filamento_g"]), 
+                step=0.001, 
+                format="%.3f",
+                key="sim_fil"
+            )
+        with col_sc2:
+            st.session_state["custo_hora_maquina"] = st.number_input(
+                "Custo Hora Máquina (€/h)", 
+                min_value=0.0, 
+                value=float(st.session_state["custo_hora_maquina"]), 
+                step=0.10, 
+                format="%.2f",
+                key="sim_maq"
+            )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_sim1, col_sim2 = st.columns(2)
+    
+    with col_sim1:
+        sim_nome = st.text_input("Nome / Descrição do Projeto (Opcional)", value="Projeto Personalizado")
+        sim_tempo = st.number_input("Tempo de Impressão (Horas)", min_value=0.0, step=0.5, value=5.0, key="sim_tempo")
+        
+    with col_sim2:
+        sim_material = st.number_input("Material Utilizado (Gramas)", min_value=0.0, step=1.0, value=100.0, key="sim_mat")
+        sim_margem = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, step=10.0, value=100.0, key="sim_mar")
+
+    # Cálculos instantâneos
+    c_fil_Atual = st.session_state["custo_filamento_g"]
+    c_maq_Atual = st.session_state["custo_hora_maquina"]
+    
+    custo_producao_sim = (sim_material * c_fil_Atual) + (sim_tempo * c_maq_Atual)
+    lucro_sim = custo_producao_sim * (sim_margem / 100)
+    preco_venda_sim = custo_producao_sim + lucro_sim
+
+    st.markdown("---")
+    st.markdown("<h3 style='color: #103b57;'>📊 Resultado da Simulação</h3>", unsafe_allow_html=True)
+    
+    r_col1, r_col2, r_col3 = st.columns(3)
+    with r_col1:
+        st.markdown(f"**Custo de Produção:**<br><span style='font-size: 24px; color: #103b57;'>€ {custo_producao_sim:.2f}</span>", unsafe_allow_html=True)
+    with r_col2:
+        st.markdown(f"**Lucro Estimado ({sim_margem:.0f}%):**<br><span style='font-size: 24px; color: #103b57;'>€ {lucro_sim:.2f}</span>", unsafe_allow_html=True)
+    with r_col3:
+        st.markdown(f"**Preço de Venda Sugerido:**<br><span style='font-size: 28px; color: #C5A059; font-weight: bold;'>€ {preco_venda_sim:.2f}</span>", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("➕ Quero cadastrar este projeto no catálogo", use_container_width=True):
+        # Preenche os dados temporários e vai para a página de cadastro
+        st.session_state["edit_index"] = None
+        st.session_state["pagina_atual"] = "Cadastrar"
+        st.rerun()
 
 # ==========================================
 # PÁGINA 4: GERADOR DE ORÇAMENTOS

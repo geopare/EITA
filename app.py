@@ -105,6 +105,9 @@ def carregar_dados():
     if os.path.exists(ARQUIVO_DADOS):
         try:
             df = pd.read_csv(ARQUIVO_DADOS)
+            # Garantir compatibilidade com bases antigas que não tinham a coluna de gastos extras
+            if "gastos_extras" not in df.columns:
+                df["gastos_extras"] = 0.0
             return df.to_dict("records")
         except Exception:
             return []
@@ -116,7 +119,7 @@ def salvar_dados(produtos_lista):
         df.to_csv(ARQUIVO_DADOS, index=False)
         
         csv_bytes = df.to_csv(index=False).encode('utf-8')
-        salvar_arquivo_no_github(ARQUIVO_DADOS, csv_bytes, "Atualização automática do banco de produtos")
+        salvar_arquivo_no_github(ARQUIVO_DADOS, csv_bytes, "Atualização automática do banco de produtos com gastos extras")
     except Exception as e:
         st.error(f"Erro ao salvar dados localmente: {e}")
 
@@ -248,6 +251,8 @@ with st.sidebar:
     if arquivo_backup is not None:
         try:
             df_import = pd.read_csv(arquivo_backup)
+            if "gastos_extras" not in df_import.columns:
+                df_import["gastos_extras"] = 0.0
             st.session_state["produtos"] = df_import.to_dict("records")
             salvar_dados(st.session_state["produtos"])
             st.success("Backup restaurado com sucesso!")
@@ -333,6 +338,7 @@ elif st.session_state["pagina_atual"] == "Produtos":
                         with col_info1:
                             st.write(f"**Tempo:** {p.get('tempo')} h")
                             st.write(f"**Material:** {p.get('material')} g")
+                            st.write(f"**Extras:** € {float(p.get('gastos_extras', 0.0)):.2f}")
                         with col_info2:
                             st.write(f"**Custo Produção:** € {p.get('producao', 0):.2f}")
                             st.write(f"**Margem:** {p.get('margem')}%")
@@ -371,7 +377,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
     
     prod_edit = st.session_state["produtos"][st.session_state["edit_index"]] if is_editing else {
         "codigo": "", "nome": "", "categoria": "Decoração",
-        "tempo": 0.0, "material": 0.0, "margem": 100.0, "imagem": None
+        "tempo": 0.0, "material": 0.0, "gastos_extras": 0.0, "margem": 100.0, "imagem": None
     }
 
     with st.expander("⚙️ Ajustar Custos Base de Cálculo (€)", expanded=False):
@@ -415,6 +421,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
     with col_f2:
         tempo_impressao = st.number_input("Tempo de Impressão (Horas)", min_value=0.0, step=0.5, value=float(prod_edit.get("tempo", 0.0)))
         material_uso = st.number_input("Material Utilizado (Gramas)", min_value=0.0, step=1.0, value=float(prod_edit.get("material", 0.0)))
+        gastos_extras = st.number_input("Gastos Extras / Insumos (€) [Ex: argolas, fitas, embalagens]", min_value=0.0, step=0.05, value=float(prod_edit.get("gastos_extras", 0.0)), format="%.2f")
         margem_desejada = st.number_input("Margem de Lucro (%)", min_value=0.0, step=10.0, value=float(prod_edit.get("margem", 100.0)))
 
     foto_produto = st.file_uploader("Carregar Imagem / Foto do Produto", type=["jpg", "jpeg", "png"])
@@ -428,7 +435,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                 c_fil = st.session_state["custo_filamento_g"]
                 c_maq = st.session_state["custo_hora_maquina"]
                 
-                preco_producao = (material_uso * c_fil) + (tempo_impressao * c_maq)
+                preco_producao = (material_uso * c_fil) + (tempo_impressao * c_maq) + gastos_extras
                 valor_lucro = preco_producao * (margem_desejada / 100)
                 preco_venda = preco_producao + valor_lucro
                 
@@ -449,6 +456,7 @@ elif st.session_state["pagina_atual"] == "Cadastrar":
                     "categoria": categoria,
                     "tempo": tempo_impressao,
                     "material": material_uso,
+                    "gastos_extras": gastos_extras,
                     "producao": preco_producao,
                     "margem": margem_desejada,
                     "venda": preco_venda,
@@ -506,6 +514,7 @@ elif st.session_state["pagina_atual"] == "Simulador":
     with col_sim1:
         sim_nome = st.text_input("Nome / Descrição do Projeto (Opcional)", value="Projeto Personalizado")
         sim_tempo = st.number_input("Tempo de Impressão (Horas)", min_value=0.0, step=0.5, value=5.0, key="sim_tempo")
+        sim_extras = st.number_input("Gastos Extras / Insumos (€)", min_value=0.0, step=0.05, value=0.0, format="%.2f", key="sim_extras")
         
     with col_sim2:
         sim_material = st.number_input("Material Utilizado (Gramas)", min_value=0.0, step=1.0, value=100.0, key="sim_mat")
@@ -515,7 +524,7 @@ elif st.session_state["pagina_atual"] == "Simulador":
     c_fil_Atual = st.session_state["custo_filamento_g"]
     c_maq_Atual = st.session_state["custo_hora_maquina"]
     
-    custo_producao_sim = (sim_material * c_fil_Atual) + (sim_tempo * c_maq_Atual)
+    custo_producao_sim = (sim_material * c_fil_Atual) + (sim_tempo * c_maq_Atual) + sim_extras
     lucro_sim = custo_producao_sim * (sim_margem / 100)
     preco_venda_sim = custo_producao_sim + lucro_sim
 
@@ -532,7 +541,6 @@ elif st.session_state["pagina_atual"] == "Simulador":
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("➕ Quero cadastrar este projeto no catálogo", use_container_width=True):
-        # Preenche os dados temporários e vai para a página de cadastro
         st.session_state["edit_index"] = None
         st.session_state["pagina_atual"] = "Cadastrar"
         st.rerun()
@@ -605,7 +613,7 @@ elif st.session_state["pagina_atual"] == "Orcamento":
                         st.markdown(f"Subtotal: **€ {subtotal_liquido:.2f}**")
                     
                     desc_str = f" (-{desc:.0f}%)" if desc > 0 else ""
-                    resumo_texto += f"• *{qtd}x {nome}* ({codigo})\n  € {preco_unit:.2f} un. → *€ {subtotal_liquido:.2f}*{desc_str}\n\n"
+                    resumo_texto += f"• *{qtd}x {nome} ({codigo})*\n  € {preco_unit:.2f} un. → *€ {subtotal_liquido:.2f}*{desc_str}\n\n"
 
             resumo_texto += f"-----------------------------\n💰 *TOTAL DO ORÇAMENTO: € {total_orcamento:.2f}*"
 

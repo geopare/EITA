@@ -261,7 +261,7 @@ elif st.session_state["pagina_atual"] == "Compras":
             cor = st.text_input("Cor / Variante (ex: Branco)", value=item_compra_atual.get("cor", "")).strip().upper()
             quantidade = st.number_input("Quantidade Comprada", min_value=0.01, step=1.0, value=float(item_compra_atual.get("quantidade", 1.0)))
             
-            unidades_disponiveis = ["KG", "G", "UN", "METROS", "PCT"]
+            unidades_disponiveis = ["KG", "UN", "METROS", "PCT", "G"]
             un_atual = item_compra_atual.get("unidade", "KG")
             un_idx = unidades_disponiveis.index(un_atual) if un_atual in unidades_disponiveis else 0
             unidade = st.selectbox("Unidade", unidades_disponiveis, index=un_idx)
@@ -281,9 +281,21 @@ elif st.session_state["pagina_atual"] == "Compras":
 
             custo_total = st.number_input("Custo Total da Compra (€)", min_value=0.0, step=0.50, format="%.2f", value=float(item_compra_atual.get("custo_total", 0.0)))
             
-            custo_unitario_sugerido = custo_total / quantidade if quantidade > 0 else 0.0
+            # Cálculo automático conforme regra solicitada:
+            # Se KG -> divide o custo total por (quantidade * 1000) para achar o custo por grama, ou se a quantidade já estiver em KG, custo_total / (quantidade * 1000)
+            # Se UN -> custo_total / quantidade
+            if unidade == "KG" and quantidade > 0:
+                custo_unitario_sugerido = custo_total / (quantidade * 1000) # Custo por grama
+                rotulo_custo_unit = "Custo por Grama (€/g)"
+            elif unidade == "UN" and quantidade > 0:
+                custo_unitario_sugerido = custo_total / quantidade # Custo por unidade
+                rotulo_custo_unit = "Custo por Unidade (€/un)"
+            else:
+                custo_unitario_sugerido = custo_total / quantidade if quantidade > 0 else 0.0
+                rotulo_custo_unit = "Custo Unitário / por Grama (€)"
+
             custo_unit_val = float(item_compra_atual.get("custo_unitario", custo_unitario_sugerido))
-            custo_unitario = st.number_input("Custo da Unidade ou por Grama (€)", min_value=0.0, value=custo_unit_val, step=0.001, format="%.3f")
+            custo_unitario = st.number_input(rotulo_custo_unit, min_value=0.0, value=custo_unit_val, step=0.001, format="%.4f")
 
         btn_texto = "Salvar Alterações da Compra" if is_edit_compra else "Salvar Compra e Atualizar Estoque"
         submitted = st.form_submit_button(btn_texto)
@@ -333,7 +345,8 @@ elif st.session_state["pagina_atual"] == "Compras":
                     st.write(f"**Nota Fiscal:** {compra.get('nota_fiscal')}")
                 with c_info2:
                     st.write(f"**Custo Total:** € {compra.get('custo_total'):.2f}")
-                    st.write(f"**Custo Unitário:** € {compra.get('custo_unitario'):.3f}")
+                    tipo_custo = "por Grama" if compra.get('unidade') == 'KG' else "por Unidade"
+                    st.write(f"**Custo {tipo_custo}:** € {compra.get('custo_unitario'):.4f}")
                 with c_btn1:
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("✏️ Editar", key=f"edit_compra_{idx}"):
@@ -354,7 +367,7 @@ elif st.session_state["pagina_atual"] == "Compras":
 elif st.session_state["pagina_atual"] == "EstoqueMateriais":
     renderizar_cabecalho("ESTOQUE DE MATERIAIS CONSOLIDADO")
     st.markdown("---")
-    st.markdown("O sistema consolida automaticamente compras da mesma categoria e cor, somando as quantidades e recalculando os custos médios.")
+    st.markdown("O sistema consolida automaticamente compras da mesma categoria e cor, somando as quantidades e recalculando os custos.")
 
     if not st.session_state["compras"]:
         st.info("Nenhuma compra registrada ainda.")
@@ -364,7 +377,11 @@ elif st.session_state["pagina_atual"] == "EstoqueMateriais":
             "quantidade": "sum",
             "custo_total": "sum"
         })
-        df_agrupado["Custo Unitário Médio (€)"] = df_agrupado["custo_total"] / df_agrupado["quantidade"]
+        # Recalcular a média ponderada do custo unitário/por grama de forma correta
+        df_agrupado["Custo Unitário / por Grama Médio (€)"] = df_agrupado.apply(
+            lambda r: (r["custo_total"] / (r["quantidade"] * 1000)) if r["unidade"] == "KG" and r["quantidade"] > 0 
+            else (r["custo_total"] / r["quantidade"] if r["quantidade"] > 0 else 0), axis=1
+        )
 
         st.dataframe(df_agrupado, use_container_width=True)
 
@@ -445,95 +462,4 @@ elif st.session_state["pagina_atual"] == "Producao":
                     st.write(f"**PLA Total:** {prod.get('pla_total')}g")
                 with c_info2:
                     st.write(f"**Material Extra:** {prod.get('material_extra')}")
-                    st.write(f"**Custo Unitário:** € {prod.get('custo_unidade'):.2f}")
-                with c_btn1:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("✏️ Editar", key=f"edit_prod_{idx}"):
-                        st.session_state["edit_idx_producao"] = idx
-                        st.rerun()
-                with c_btn2:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("🗑️ Excluir", key=f"del_prod_{idx}"):
-                        st.session_state["producao"].pop(idx)
-                        salvar_csv(ARQUIVO_PRODUCAO, st.session_state["producao"], "Produção excluída")
-                        st.success("Produção removida com sucesso!")
-                        time.sleep(1)
-                        st.rerun()
-
-# ==========================================
-# ABA 4: PRODUTOS EM ESTOQUE (ACABADOS)
-# ==========================================
-elif st.session_state["pagina_atual"] == "ProdutosProntos":
-    renderizar_cabecalho("PRODUTOS ACABADOS EM ESTOQUE")
-    st.markdown("---")
-    st.markdown("Lista consolidada de tudo o que foi produzido menos o que já foi vendido.")
-
-    if not st.session_state["producao"]:
-        st.info("Nenhum produto produzido até o momento.")
-    else:
-        df_prod = pd.DataFrame(st.session_state["producao"])
-        df_vend = pd.DataFrame(st.session_state["vendas"]) if st.session_state["vendas"] else pd.DataFrame(columns=["codigo", "qtd_vendida"])
-
-        estoque_produzido = df_prod.groupby(["codigo", "nome", "categoria", "custo_unidade"], as_index=False).agg({"qtd_produzida": "sum"})
-        
-        if not df_vend.empty and "codigo" in df_vend.columns:
-            vendas_agrupadas = df_vend.groupby("codigo", as_index=False).agg({"qtd_vendida": "sum"})
-            estoque_final = pd.merge(estoque_produzido, vendas_agrupadas, on="codigo", how="left").fillna(0)
-            estoque_final["Estoque Atual"] = estoque_final["qtd_produzida"] - estoque_final["qtd_vendida"]
-        else:
-            estoque_final = estoque_produzido.copy()
-            estoque_final["Estoque Atual"] = estoque_final["qtd_produzida"]
-
-        estoque_final["Valor Total em Estoque (€)"] = estoque_final["Estoque Atual"] * estoque_final["custo_unidade"]
-
-        st.dataframe(estoque_final[["codigo", "nome", "categoria", "Estoque Atual", "custo_unidade", "Valor Total em Estoque (€)"]], use_container_width=True)
-
-# ==========================================
-# ABA 5: VENDAS (SAÍDAS)
-# ==========================================
-elif st.session_state["pagina_atual"] == "Vendas":
-    edit_idx_v = st.session_state["edit_idx_venda"]
-    is_edit_venda = edit_idx_v is not None
-    titulo_venda = "EDITAR VENDA" if is_edit_venda else "REGISTRAR VENDAS"
-
-    renderizar_cabecalho(titulo_venda)
-    st.markdown("---")
-
-    if not st.session_state["producao"]:
-        st.warning("Cadastre uma produção antes de registrar vendas.")
-    else:
-        df_prod = pd.DataFrame(st.session_state["producao"])
-        df_vend = pd.DataFrame(st.session_state["vendas"]) if st.session_state["vendas"] else pd.DataFrame(columns=["codigo", "qtd_vendida"])
-        
-        prod_totais = df_prod.groupby(["codigo", "nome", "custo_unidade"], as_index=False).agg({"qtd_produzida": "sum"})
-        if not df_vend.empty and "codigo" in df_vend.columns:
-            vendas_totais = df_vend.groupby("codigo", as_index=False).agg({"qtd_vendida": "sum"})
-            estoque_atual = pd.merge(prod_totais, vendas_totais, on="codigo", how="left").fillna(0)
-            estoque_atual["disponivel"] = estoque_atual["qtd_produzida"] - estoque_atual["qtd_vendida"]
-        else:
-            estoque_atual = prod_totais.copy()
-            estoque_atual["disponivel"] = estoque_atual["qtd_produzida"]
-
-        opcoes_venda = {
-            f"{row['codigo']} — {row['nome']} (Disponível: {int(row['disponivel'])})": row 
-            for _, row in estoque_atual.iterrows() if row["disponivel"] > 0
-        }
-
-        if not opcoes_venda and not is_edit_venda:
-            st.info("Não há produtos com estoque disponível para venda no momento.")
-        else:
-            item_venda_atual = st.session_state["vendas"][edit_idx_v] if is_edit_venda else {}
-
-            with st.form("form_venda"):
-                data_venda = st.date_input("Data da Venda")
-                
-                chaves_opcoes = list(opcoes_venda.keys())
-                default_idx = 0
-                if is_edit_venda:
-                    codigo_editando = item_venda_atual.get("codigo")
-                    for idx_op, ch in enumerate(chaves_opcoes):
-                        if codigo_editando in ch:
-                            default_idx = idx_op
-                            break
-
-                produto_escolhido_chave = st.selectbox
+                    st.write(f"**Custo Unit

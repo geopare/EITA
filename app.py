@@ -123,9 +123,7 @@ def importar_dados_antigos():
                     "nome": str(row.get("nome", "Produto Antigo")),
                     "categoria": str(row.get("categoria", "Outros")),
                     "qtd_produzida": 1,
-                    "pla_por_unidade": float(row.get("material", 0.0)),
-                    "pla_total": float(row.get("material", 0.0)),
-                    "material_extra": float(row.get("gastos_extras", 0.0)) if "gastos_extras" in row else 0.0,
+                    "detalhes_insumos": f"PLA: {float(row.get('material', 0.0))}g",
                     "custo_unidade": float(row.get("producao", 0.0)) if "producao" in row else 0.0
                 })
             return produtos_convertidos
@@ -136,13 +134,13 @@ def importar_dados_antigos():
 # Inicialização do State
 if "compras" not in st.session_state:
     st.session_state["compras"] = carregar_csv(ARQUIVO_COMPRAS, {
-        "data": "", "nome_material": "", "categoria": "", "cor": "", 
+        "data": "", "nome_material": "", "tipo_material": "PLA", "cor": "", 
         "quantidade": 0.0, "unidade": "KG", "custo_total": 0.0, 
         "nota_fiscal": "", "fornecedor": ""
     })
 
 if "producao" not in st.session_state:
-    dados_iniciais_prod = carregar_csv(ARQUIVO_PRODUCAO, {"data": "", "codigo": "", "nome": "", "categoria": "", "qtd_produzida": 0, "pla_por_unidade": 0.0, "pla_total": 0.0, "material_extra": 0.0, "custo_unidade": 0.0})
+    dados_iniciais_prod = carregar_csv(ARQUIVO_PRODUCAO, {"data": "", "codigo": "", "nome": "", "categoria": "", "qtd_produzida": 0, "detalhes_insumos": "", "custo_unidade": 0.0})
     if not dados_iniciais_prod:
         dados_iniciais_prod = importar_dados_antigos()
     st.session_state["producao"] = dados_iniciais_prod
@@ -161,7 +159,8 @@ if "edit_idx_venda" not in st.session_state:
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "Home"
 
-categorias_lista = ["Decoração", "Utilitários", "Miniaturas", "Laços", "Acessórios", "Organização", "Natal", "Religiao", "PLA", "TAG", "Papelaria", "Outros"]
+tipos_materiais_lista = ["PLA", "TAG", "Argola", "NFC", "Papelaria", "Embalagem", "Outros"]
+categorias_produtos_lista = ["Decoração", "Utilitários", "Miniaturas", "Chaveiros", "Acessórios", "Organização", "Natal", "Religiao", "Outros"]
 
 def renderizar_cabecalho(titulo):
     col1, col2 = st.columns([4, 1])
@@ -249,11 +248,11 @@ elif st.session_state["pagina_atual"] == "Compras":
         col1, col2 = st.columns(2)
         with col1:
             data_compra = st.date_input("Data da Compra")
-            nome_material = st.text_input("Nome do Material (ex: Filamento PLA, Argola, TAG)", value=item_compra_atual.get("nome_material", "")).strip()
+            nome_material = st.text_input("Nome do Material (ex: Filamento Branco, Argola 12mm)", value=item_compra_atual.get("nome_material", "")).strip()
             
-            cat_atual = item_compra_atual.get("categoria", categorias_lista[0])
-            cat_idx = categorias_lista.index(cat_atual) if cat_atual in categorias_lista else 0
-            categoria = st.selectbox("Categoria", categorias_lista, index=cat_idx)
+            tipo_atual = item_compra_atual.get("tipo_material", tipos_materiais_lista[0])
+            tipo_idx = tipos_materiais_lista.index(tipo_atual) if tipo_atual in tipos_materiais_lista else 0
+            tipo_material = st.selectbox("Tipo do Material (Classificação)", tipos_materiais_lista, index=tipo_idx)
             
             cor = st.text_input("Cor / Variante (ex: Branco, Prata)", value=item_compra_atual.get("cor", "")).strip().upper()
             quantidade = st.number_input("Quantidade Comprada", min_value=0.01, step=1.0, value=float(item_compra_atual.get("quantidade", 1.0)))
@@ -288,7 +287,7 @@ elif st.session_state["pagina_atual"] == "Compras":
                 nova_compra = {
                     "data": str(data_compra),
                     "nome_material": nome_material,
-                    "categoria": categoria,
+                    "tipo_material": tipo_material,
                     "cor": cor,
                     "quantidade": float(quantidade),
                     "unidade": unidade,
@@ -317,10 +316,10 @@ elif st.session_state["pagina_atual"] == "Compras":
     st.markdown("### 📋 Histórico de Compras (Gerenciar Itens)")
     if st.session_state["compras"]:
         for idx, compra in enumerate(st.session_state["compras"]):
-            with st.expander(f"🛒 [{compra.get('data')}] {compra.get('nome_material')} - {compra.get('cor')} ({compra.get('quantidade')} {compra.get('unidade')}) - € {compra.get('custo_total'):.2f}"):
+            with st.expander(f"🛒 [{compra.get('data')}] ({compra.get('tipo_material')}) {compra.get('nome_material')} - {compra.get('cor')} ({compra.get('quantidade')} {compra.get('unidade')}) - € {compra.get('custo_total'):.2f}"):
                 c_info1, c_info2, c_btn1, c_btn2 = st.columns([2, 2, 1, 1])
                 with c_info1:
-                    st.write(f"**Categoria:** {compra.get('categoria')}")
+                    st.write(f"**Tipo:** {compra.get('tipo_material')}")
                     st.write(f"**Fornecedor:** {compra.get('fornecedor')}")
                     st.write(f"**Nota Fiscal:** {compra.get('nota_fiscal')}")
                 with c_info2:
@@ -345,27 +344,22 @@ elif st.session_state["pagina_atual"] == "Compras":
 elif st.session_state["pagina_atual"] == "EstoqueMateriais":
     renderizar_cabecalho("ESTOQUE DE MATERIAIS CONSOLIDADO")
     st.markdown("---")
-    st.markdown("O sistema consolida automaticamente compras do mesmo material e cor, calculando a quantidade total e o custo unitário médio.")
+    st.markdown("O sistema consolida automaticamente compras do mesmo material, tipo e cor, somando as quantidades e os custos totais.")
 
     if not st.session_state["compras"]:
         st.info("Nenhuma compra registrada ainda.")
     else:
         df_c = pd.DataFrame(st.session_state["compras"])
-        
-        # Calcular custo unitário médio por item comprado
-        df_c["custo_unit_medio"] = df_c["custo_total"] / df_c["quantidade"]
-        
-        df_agrupado = df_c.groupby(["nome_material", "categoria", "cor", "unidade"], as_index=False).agg({
+        df_agrupado = df_c.groupby(["tipo_material", "nome_material", "cor", "unidade"], as_index=False).agg({
             "quantidade": "sum",
-            "custo_total": "sum",
-            "custo_unit_medio": "mean"
+            "custo_total": "sum"
         })
         df_agrupado["Custo Unitário Médio (€)"] = df_agrupado["custo_total"] / df_agrupado["quantidade"]
 
-        st.dataframe(df_agrupado[["nome_material", "categoria", "cor", "quantidade", "unidade", "Custo Unitário Médio (€)"]], use_container_width=True)
+        st.dataframe(df_agrupado, use_container_width=True)
 
 # ==========================================
-# ABA 3: PRODUÇÃO DIÁRIA
+# ABA 3: PRODUÇÃO DIÁRIA (MÚLTIPLOS INSUMOS)
 # ==========================================
 elif st.session_state["pagina_atual"] == "Producao":
     edit_idx_p = st.session_state["edit_idx_producao"]
@@ -385,17 +379,19 @@ elif st.session_state["pagina_atual"] == "Producao":
             label_prod = f"{r.get('codigo')} — {r.get('nome')} ({r.get('categoria')})"
             produtos_unicos_cadastrados[label_prod] = r
 
-    # Obter materiais disponíveis em estoque para seleção de extras (ex: Argolas, TAGs)
-    materiais_extras_disponiveis = {}
+    # Mapear materiais disponíveis no estoque
+    materiais_estoque_map = {}
     if st.session_state["compras"]:
-        df_compras_estoque = pd.DataFrame(st.session_state["compras"])
-        df_mat_agrupado = df_compras_estoque.groupby(["nome_material", "unidade"], as_index=False).agg({"quantidade": "sum", "custo_total": "sum"})
-        df_mat_agrupado["custo_unit"] = df_mat_agrupado["custo_total"] / df_mat_agrupado["quantidade"]
-        for _, row in df_mat_agrupado.iterrows():
-            nome_mat = row["nome_material"]
-            materiais_extras_disponiveis[nome_mat] = {
-                "custo_unit": float(row["custo_unit"]),
-                "unidade": row["unidade"]
+        df_comp = pd.DataFrame(st.session_state["compras"])
+        df_comp_ag = df_comp.groupby(["tipo_material", "nome_material", "unidade"], as_index=False).agg({"quantidade": "sum", "custo_total": "sum"})
+        df_comp_ag["custo_unit"] = df_comp_ag["custo_total"] / df_comp_ag["quantidade"]
+        for _, r in df_comp_ag.iterrows():
+            chave = f"[{r['tipo_material']}] {r['nome_material']} (Disp: {r['quantidade']:.1f} {r['unidade']})"
+            materiais_estoque_map[chave] = {
+                "tipo": r["tipo_material"],
+                "nome": r["nome_material"],
+                "unidade": r["unidade"],
+                "custo_unit": float(r["custo_unit"]) if r["quantidade"] > 0 else 0.0
             }
 
     with st.form("form_producao"):
@@ -412,63 +408,80 @@ elif st.session_state["pagina_atual"] == "Producao":
                 codigo_prod = dados_selecionados.get("codigo")
                 nome_prod = dados_selecionados.get("nome")
                 cat_p_atual = dados_selecionados.get("categoria")
-                pla_por_uni_default = float(dados_selecionados.get("pla_por_unidade", 0.0))
-                custo_uni_default = float(dados_selecionados.get("custo_unidade", 0.0))
-                
                 st.info(f"Selecionado: **{codigo_prod} - {nome_prod}**")
             else:
                 codigo_prod = st.text_input("Código do Produto (SKU)", value=item_prod_atual.get("codigo", "")).strip().upper()
                 nome_prod = st.text_input("Nome do Produto", value=item_prod_atual.get("nome", "")).strip()
-                pla_por_uni_default = float(item_prod_atual.get("pla_por_unidade", 0.0))
-                custo_uni_default = float(item_prod_atual.get("custo_unidade", 0.0))
-                cat_p_atual = item_prod_atual.get("categoria", categorias_lista[0])
+                cat_p_atual = item_prod_atual.get("categoria", categorias_produtos_lista[0])
 
-            cat_p_idx = categorias_lista.index(cat_p_atual) if cat_p_atual in categorias_lista else 0
-            categoria_prod = st.selectbox("Categoria", categorias_lista, index=cat_p_idx)
+            cat_p_idx = categorias_produtos_lista.index(cat_p_atual) if cat_p_atual in categorias_produtos_lista else 0
+            categoria_prod = st.selectbox("Categoria do Produto", categorias_produtos_lista, index=cat_p_idx)
+            qtd_produzida = st.number_input("Quantidade Produzida (unidades)", min_value=1, step=1, value=int(item_prod_atual.get("qtd_produzida", 1)))
 
         with col2:
-            qtd_produzida = st.number_input("Quantidade Produzida (unidades)", min_value=1, step=1, value=int(item_prod_atual.get("qtd_produzida", 1)))
-            pla_por_uni = st.number_input("Consumo de PLA por Unidade (gramas)", min_value=0.0, step=1.0, value=pla_por_uni_default)
+            st.markdown("##### 🧪 Composição de Insumos (Por Unidade Produzida)")
+            st.markdown("Escolha múltiplos materiais do estoque que entram na fabricação de **1 unidade** deste produto:")
             
-            # Seleção de Material Extra (Argola, TAG, etc.) vindo do estoque de compras
-            st.markdown("##### 🔗 Insumo / Material Extra por Unidade")
-            lista_extras_opcoes = ["Nenhum"] + list(materiais_extras_disponiveis.keys())
-            material_extra_escolhido = st.selectbox("Escolher Material Extra do Estoque", lista_extras_opcoes)
-            
-            qtd_extra_por_uni = st.number_input("Qtd de Material Extra por Unidade", min_value=0.0, step=1.0, value=1.0)
+            materiais_escolhidos_para_baixa = []
+            custo_total_calculado_unitario = 0.0
 
-            # Cálculo automático do custo do extra se selecionado
-            custo_extra_calculado = 0.0
-            if material_extra_escolhido != "Nenhum" and material_extra_escolhido in materiais_extras_disponiveis:
-                custo_extra_calculado = materiais_extras_disponiveis[material_extra_escolhido]["custo_unit"] * qtd_extra_por_uni
+            if materiais_estoque_map:
+                # Seleção de até 3 componentes comuns por produto
+                opcoes_materiais = ["Nenhum"] + list(materiais_estoque_map.keys())
+                
+                mat_1 = st.selectbox("Insumo 1 (ex: PLA)", opcoes_materiais, index=0)
+                qtd_1 = st.number_input("Qtd Insumo 1 por Unidade", min_value=0.0, step=1.0, value=0.0)
 
-            custo_uni = st.number_input("Custo Unitário de Produção (€)", min_value=0.0, step=0.10, value=float(custo_uni_default + custo_extra_calculado))
+                mat_2 = st.selectbox("Insumo 2 (ex: Argola)", opcoes_materiais, index=0)
+                qtd_2 = st.number_input("Qtd Insumo 2 por Unidade", min_value=0.0, step=1.0, value=0.0)
 
-        btn_txt_p = "Salvar Alterações da Produção" if is_edit_prod else "Registrar Produção e Baixar Estoque"
+                mat_3 = st.selectbox("Insumo 3 (ex: NFC / Tag)", opcoes_materiais, index=0)
+                qtd_3 = st.number_input("Qtd Insumo 3 por Unidade", min_value=0.0, step=1.0, value=0.0)
+
+                # Processar custos e insumos escolhidos
+                for mat_sel, q_sel in [(mat_1, qtd_1), (mat_2, qtd_2), (mat_3, qtd_3)]:
+                    if mat_sel != "Nenhum" and q_sel > 0:
+                        info_mat = materiais_estoque_map[mat_sel]
+                        custo_item = info_mat["custo_unit"] * q_sel
+                        custo_total_calculado_unitario += custo_item
+                        materiais_escolhidos_para_baixa.append({
+                            "nome": info_mat["nome"],
+                            "unidade": info_mat["unidade"],
+                            "qtd_por_unidade": q_sel
+                        })
+            else:
+                st.warning("Cadastre compras de materiais primeiro para poder compor a produção.")
+
+            custo_uni = st.number_input("Custo Unitário Final (€) [Calculado automático ou customizável]", min_value=0.0, step=0.10, value=float(item_prod_atual.get("custo_unidade", custo_total_calculado_unitario)))
+
+        btn_txt_p = "Salvar Alterações da Produção" if is_edit_prod else "Registrar Produção e Baixar Insumos"
         submitted_prod = st.form_submit_button(btn_txt_p)
         
         if submitted_prod:
             if not codigo_prod or not nome_prod:
                 st.error("Preencha o código e o nome do produto.")
             else:
-                pla_total = pla_por_uni * qtd_produzida
-                
-                # Se escolheu material extra, registrar uma compra negativa para dar baixa no estoque de materiais!
-                if material_extra_escolhido != "Nenhum":
-                    qtd_total_extra_gasto = qtd_extra_por_uni * qtd_produzida
-                    nova_baixa_extra = {
+                # Resumo textual dos insumos para exibir no histórico
+                texto_insumos_resumo = ", ".join([f"{item['qtd_por_unidade']} {item['unidade']} de {item['nome']}" for item in materiais_escolhidos_para_baixa]) if materiais_escolhidos_para_baixa else "Insumos manuais"
+
+                # Dar baixa no estoque para cada insumo utilizado (Qtd por unidade * Qtd produzida)
+                for item in materiais_escolhidos_para_baixa:
+                    qtd_total_baixa = item["qtd_por_unidade"] * qtd_produzida
+                    nova_baixa = {
                         "data": str(data_prod),
-                        "nome_material": material_extra_escolhido,
-                        "categoria": "Outros",
+                        "nome_material": item["nome"],
+                        "tipo_material": "CONSUMO",
                         "cor": "GERAL",
-                        "quantidade": -qtd_total_extra_gasto, # Negativo para abater do estoque
-                        "unidade": materiais_extras_disponiveis[material_extra_escolhido]["unidade"],
+                        "quantidade": -qtd_total_baixa, # Negativo para abater do estoque
+                        "unidade": item["unidade"],
                         "custo_total": 0.0,
-                        "nota_fiscal": f"Baixa Produção {codigo_prod}",
+                        "nota_fiscal": f"Prod {codigo_prod}",
                         "fornecedor": "Consumo Interno"
                     }
-                    st.session_state["compras"].append(nova_baixa_extra)
-                    salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], "Baixa de insumo extra no estoque")
+                    st.session_state["compras"].append(nova_baixa)
+                
+                if materiais_escolhidos_para_baixa:
+                    salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], "Baixa de múltiplos insumos na produção")
 
                 nova_prod = {
                     "data": str(data_prod),
@@ -476,9 +489,7 @@ elif st.session_state["pagina_atual"] == "Producao":
                     "nome": nome_prod,
                     "categoria": categoria_prod,
                     "qtd_produzida": int(qtd_produzida),
-                    "pla_por_unidade": float(pla_por_uni),
-                    "pla_total": float(pla_total),
-                    "material_extra": float(custo_extra_calculado if material_extra_escolhido != "Nenhum" else 0.0),
+                    "detalhes_insumos": texto_insumos_resumo,
                     "custo_unidade": float(custo_uni)
                 }
                 
@@ -488,7 +499,7 @@ elif st.session_state["pagina_atual"] == "Producao":
                     msg_p = "Produção atualizada com sucesso!"
                 else:
                     st.session_state["producao"].append(nova_prod)
-                    msg_p = "Produção registrada com sucesso!"
+                    msg_p = "Produção registrada com baixa de insumos!"
 
                 salvar_csv(ARQUIVO_PRODUCAO, st.session_state["producao"], msg_p)
                 st.success(msg_p)
@@ -504,7 +515,7 @@ elif st.session_state["pagina_atual"] == "Producao":
     if not st.session_state["producao"]:
         st.info("Nenhuma produção registrada até o momento.")
     else:
-        for cat in categorias_lista:
+        for cat in categorias_produtos_lista:
             prods_desta_cat = [(idx_g, p) for idx_g, p in enumerate(st.session_state["producao"]) if p.get("categoria") == cat]
             
             if prods_desta_cat:
@@ -513,10 +524,8 @@ elif st.session_state["pagina_atual"] == "Producao":
                         st.markdown(f"**[{prod.get('data')}] {prod.get('codigo')} — {prod.get('nome')}** (Qtd: {prod.get('qtd_produzida')} un.)")
                         c_info1, c_info2, c_btn1, c_btn2 = st.columns([2, 2, 1, 1])
                         with c_info1:
-                            st.write(f"• PLA por Unidade: {prod.get('pla_por_unidade')}g")
-                            st.write(f"• PLA Total: {prod.get('pla_total')}g")
+                            st.write(f"• Insumos: {prod.get('detalhes_insumos', 'N/A')}")
                         with c_info2:
-                            st.write(f"• Custo Extra: € {float(prod.get('material_extra', 0.0)):.2f}")
                             st.write(f"• Custo Unitário: € {float(prod.get('custo_unidade', 0.0)):.2f}")
                         with c_btn1:
                             if st.button("✏️ Editar", key=f"edit_prod_{idx_global}"):

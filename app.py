@@ -54,6 +54,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Arquivos de dados do sistema unificado
+ARQUIVO_ANTIGO = "produtos_3d.csv"
 ARQUIVO_COMPRAS = "compras_materiais.csv"
 ARQUIVO_PRODUCAO = "producao_itens.csv"
 ARQUIVO_VENDAS = "vendas_registros.csv"
@@ -107,12 +108,40 @@ def salvar_csv(caminho, dados, mensagem):
     except Exception as e:
         st.error(f"Erro ao salvar arquivo {caminho}: {e}")
 
+# ==========================================
+# IMPORTAÇÃO AUTOMÁTICA DOS DADOS ANTIGOS
+# ==========================================
+def importar_dados_antigos():
+    if os.path.exists(ARQUIVO_ANTIGO):
+        try:
+            df_antigo = pd.read_csv(ARQUIVO_ANTIGO)
+            produtos_convertidos = []
+            for _, row in df_antigo.iterrows():
+                produtos_convertidos.append({
+                    "data": "2026-10-01",
+                    "codigo": str(row.get("codigo", "SKU-001")),
+                    "nome": str(row.get("nome", "Produto Antigo")),
+                    "categoria": str(row.get("categoria", "Outros")),
+                    "qtd_produzida": 1,
+                    "pla_por_unidade": float(row.get("material", 0.0)),
+                    "pla_total": float(row.get("material", 0.0)),
+                    "material_extra": float(row.get("gastos_extras", 0.0)) if "gastos_extras" in row else 0.0,
+                    "custo_unidade": float(row.get("producao", 0.0)) if "producao" in row else 0.0
+                })
+            return produtos_convertidos
+        except Exception:
+            return []
+    return []
+
 # Inicialização do State
 if "compras" not in st.session_state:
     st.session_state["compras"] = carregar_csv(ARQUIVO_COMPRAS, {"categoria": "", "cor": "", "quantidade": 0.0, "unidade": "KG", "custo_total": 0.0, "fornecedor": ""})
 
 if "producao" not in st.session_state:
-    st.session_state["producao"] = carregar_csv(ARQUIVO_PRODUCAO, {"data": "", "codigo": "", "nome": "", "categoria": "", "qtd_produzida": 0, "pla_por_unidade": 0.0, "pla_total": 0.0, "material_extra": 0.0, "custo_unidade": 0.0})
+    dados_iniciais_prod = carregar_csv(ARQUIVO_PRODUCAO, {"data": "", "codigo": "", "nome": "", "categoria": "", "qtd_produzida": 0, "pla_por_unidade": 0.0, "pla_total": 0.0, "material_extra": 0.0, "custo_unidade": 0.0})
+    if not dados_iniciais_prod:
+        dados_iniciais_prod = importar_dados_antigos()
+    st.session_state["producao"] = dados_iniciais_prod
 
 if "vendas" not in st.session_state:
     st.session_state["vendas"] = carregar_csv(ARQUIVO_VENDAS, {"data": "", "codigo": "", "nome": "", "qtd_vendida": 0, "valor_total": 0.0})
@@ -242,7 +271,6 @@ elif st.session_state["pagina_atual"] == "EstoqueMateriais":
         st.info("Nenhuma compra registrada ainda.")
     else:
         df_c = pd.DataFrame(st.session_state["compras"])
-        # Agrupar por Categoria e Cor para somar quantidades e custos
         df_agrupado = df_c.groupby(["categoria", "cor", "unidade"], as_index=False).agg({
             "quantidade": "sum",
             "custo_total": "sum"
@@ -312,7 +340,6 @@ elif st.session_state["pagina_atual"] == "ProdutosProntos":
         df_prod = pd.DataFrame(st.session_state["producao"])
         df_vend = pd.DataFrame(st.session_state["vendas"]) if st.session_state["vendas"] else pd.DataFrame(columns=["codigo", "qtd_vendida"])
 
-        # Agrupar produções por código
         estoque_produzido = df_prod.groupby(["codigo", "nome", "categoria", "custo_unidade"], as_index=False).agg({"qtd_produzida": "sum"})
         
         if not df_vend.empty and "codigo" in df_vend.columns:
@@ -337,7 +364,6 @@ elif st.session_state["pagina_atual"] == "Vendas":
     if not st.session_state["producao"]:
         st.warning("Cadastre uma produção antes de registrar vendas.")
     else:
-        # Calcular estoque atual disponível de cada produto
         df_prod = pd.DataFrame(st.session_state["producao"])
         df_vend = pd.DataFrame(st.session_state["vendas"]) if st.session_state["vendas"] else pd.DataFrame(columns=["codigo", "qtd_vendida"])
         

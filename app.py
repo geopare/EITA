@@ -248,13 +248,13 @@ elif st.session_state["pagina_atual"] == "Compras":
         col1, col2 = st.columns(2)
         with col1:
             data_compra = st.date_input("Data da Compra")
-            nome_material = st.text_input("Nome do Material (ex: Filamento Branco, Argola 12mm)", value=item_compra_atual.get("nome_material", "")).strip()
+            nome_material = st.text_input("Nome do Material (ex: Filamento Branco, Argola)", value=item_compra_atual.get("nome_material", "")).strip()
             
             tipo_atual = item_compra_atual.get("tipo_material", tipos_materiais_lista[0])
             tipo_idx = tipos_materiais_lista.index(tipo_atual) if tipo_atual in tipos_materiais_lista else 0
-            tipo_material = st.selectbox("Tipo do Material (Classificação)", tipos_materiais_lista, index=tipo_idx)
+            tipo_material = st.selectbox("Tipo do Material", tipos_materiais_lista, index=tipo_idx)
             
-            cor = st.text_input("Cor / Variante (ex: Branco, Prata)", value=item_compra_atual.get("cor", "")).strip().upper()
+            cor = st.text_input("Cor / Variante (ex: Branco)", value=item_compra_atual.get("cor", "")).strip().upper()
             quantidade = st.number_input("Quantidade Comprada", min_value=0.01, step=1.0, value=float(item_compra_atual.get("quantidade", 1.0)))
             
             unidades_disponiveis = ["KG", "UN", "METROS", "PCT", "G"]
@@ -277,9 +277,7 @@ elif st.session_state["pagina_atual"] == "Compras":
 
             custo_total = st.number_input("Custo Total da Compra (€)", min_value=0.0, step=0.50, format="%.2f", value=float(item_compra_atual.get("custo_total", 0.0)))
 
-        btn_texto = "Salvar Alterações da Compra" if is_edit_compra else "Salvar Compra e Atualizar Estoque"
-        submitted = st.form_submit_button(btn_texto)
-        
+        submitted = st.form_submit_button("Salvar Compra e Atualizar Estoque")
         if submitted:
             if not nome_material or not cor:
                 st.error("Por favor, preencha o Nome do Material e a Cor/Variante.")
@@ -371,13 +369,13 @@ elif st.session_state["pagina_atual"] == "Producao":
 
     item_prod_atual = st.session_state["producao"][edit_idx_p] if is_edit_prod else {}
 
-    # Obter lista de produtos únicos já cadastrados no histórico
+    # Obter lista de produtos únicos já produzidos anteriormente (Catálogo de Referência)
     df_producao_existente = pd.DataFrame(st.session_state["producao"]) if st.session_state["producao"] else pd.DataFrame()
-    produtos_unicos_cadastrados = {}
+    catalogo_produtos = {}
     if not df_producao_existente.empty and "codigo" in df_producao_existente.columns:
         for _, r in df_producao_existente.drop_duplicates(subset=["codigo"]).iterrows():
             label_prod = f"{r.get('codigo')} — {r.get('nome')} ({r.get('categoria')})"
-            produtos_unicos_cadastrados[label_prod] = r
+            catalogo_produtos[label_prod] = r
 
     # Mapear materiais disponíveis no estoque
     materiais_estoque_map = {}
@@ -399,16 +397,22 @@ elif st.session_state["pagina_atual"] == "Producao":
         with col1:
             data_prod = st.date_input("Data da Produção")
             
-            modo_cadastro = st.radio("Origem do Produto", ["Selecionar produto já cadastrado", "Cadastrar novo produto"], horizontal=True)
+            # Escolha clara entre usar um produto já cadastrado no catálogo ou criar um novo
+            origem_cadastro = st.radio("Produto", ["Cadastrar novo produto", "Selecionar do catálogo de produtos"], horizontal=True)
             
-            if modo_cadastro == "Selecionar produto já cadastrado" and produtos_unicos_cadastrados:
-                prod_escolhido_combo = st.selectbox("Escolha o Produto", list(produtos_unicos_cadastrados.keys()))
-                dados_selecionados = produtos_unicos_cadastrados[prod_escolhido_combo]
+            codigo_prod = ""
+            nome_prod = ""
+            cat_p_atual = categorias_produtos_lista[0]
+            
+            if origem_cadastro == "Selecionar do catálogo de produtos" and catalogo_produtos:
+                prod_escolhido_combo = st.selectbox("Escolha o Produto Existente", list(catalogo_produtos.keys()))
+                dados_sel = catalogo_produtos[prod_escolhido_combo]
                 
-                codigo_prod = dados_selecionados.get("codigo")
-                nome_prod = dados_selecionados.get("nome")
-                cat_p_atual = dados_selecionados.get("categoria")
-                st.info(f"Selecionado: **{codigo_prod} - {nome_prod}**")
+                codigo_prod = dados_sel.get("codigo")
+                nome_prod = dados_sel.get("nome")
+                cat_p_atual = dados_sel.get("categoria")
+                
+                st.markdown(f"<div style='padding: 10px; background-color: #F8F9FA; border-left: 4px solid #103b57; border-radius: 4px;'><b>Produto Selecionado:</b> {codigo_prod} — {nome_prod}</div>", unsafe_allow_html=True)
             else:
                 codigo_prod = st.text_input("Código do Produto (SKU)", value=item_prod_atual.get("codigo", "")).strip().upper()
                 nome_prod = st.text_input("Nome do Produto", value=item_prod_atual.get("nome", "")).strip()
@@ -420,13 +424,12 @@ elif st.session_state["pagina_atual"] == "Producao":
 
         with col2:
             st.markdown("##### 🧪 Composição de Insumos (Por Unidade Produzida)")
-            st.markdown("Escolha múltiplos materiais do estoque que entram na fabricação de **1 unidade** deste produto:")
+            st.markdown("Selecione os materiais do estoque que entram na fabricação de **1 unidade**:")
             
             materiais_escolhidos_para_baixa = []
             custo_total_calculado_unitario = 0.0
 
             if materiais_estoque_map:
-                # Seleção de até 3 componentes comuns por produto
                 opcoes_materiais = ["Nenhum"] + list(materiais_estoque_map.keys())
                 
                 mat_1 = st.selectbox("Insumo 1 (ex: PLA)", opcoes_materiais, index=0)
@@ -438,7 +441,6 @@ elif st.session_state["pagina_atual"] == "Producao":
                 mat_3 = st.selectbox("Insumo 3 (ex: NFC / Tag)", opcoes_materiais, index=0)
                 qtd_3 = st.number_input("Qtd Insumo 3 por Unidade", min_value=0.0, step=1.0, value=0.0)
 
-                # Processar custos e insumos escolhidos
                 for mat_sel, q_sel in [(mat_1, qtd_1), (mat_2, qtd_2), (mat_3, qtd_3)]:
                     if mat_sel != "Nenhum" and q_sel > 0:
                         info_mat = materiais_estoque_map[mat_sel]
@@ -450,9 +452,9 @@ elif st.session_state["pagina_atual"] == "Producao":
                             "qtd_por_unidade": q_sel
                         })
             else:
-                st.warning("Cadastre compras de materiais primeiro para poder compor a produção.")
+                st.warning("Cadastre compras de materiais primeiro.")
 
-            custo_uni = st.number_input("Custo Unitário Final (€) [Calculado automático ou customizável]", min_value=0.0, step=0.10, value=float(item_prod_atual.get("custo_unidade", custo_total_calculado_unitario)))
+            custo_uni = st.number_input("Custo Unitário Final (€)", min_value=0.0, step=0.10, value=float(item_prod_atual.get("custo_unidade", custo_total_calculado_unitario)))
 
         btn_txt_p = "Salvar Alterações da Produção" if is_edit_prod else "Registrar Produção e Baixar Insumos"
         submitted_prod = st.form_submit_button(btn_txt_p)
@@ -461,10 +463,9 @@ elif st.session_state["pagina_atual"] == "Producao":
             if not codigo_prod or not nome_prod:
                 st.error("Preencha o código e o nome do produto.")
             else:
-                # Resumo textual dos insumos para exibir no histórico
                 texto_insumos_resumo = ", ".join([f"{item['qtd_por_unidade']} {item['unidade']} de {item['nome']}" for item in materiais_escolhidos_para_baixa]) if materiais_escolhidos_para_baixa else "Insumos manuais"
 
-                # Dar baixa no estoque para cada insumo utilizado (Qtd por unidade * Qtd produzida)
+                # Dar baixa no estoque para cada insumo utilizado proporcionalmente à quantidade produzida
                 for item in materiais_escolhidos_para_baixa:
                     qtd_total_baixa = item["qtd_por_unidade"] * qtd_produzida
                     nova_baixa = {
@@ -472,7 +473,7 @@ elif st.session_state["pagina_atual"] == "Producao":
                         "nome_material": item["nome"],
                         "tipo_material": "CONSUMO",
                         "cor": "GERAL",
-                        "quantidade": -qtd_total_baixa, # Negativo para abater do estoque
+                        "quantidade": -qtd_total_baixa,
                         "unidade": item["unidade"],
                         "custo_total": 0.0,
                         "nota_fiscal": f"Prod {codigo_prod}",
@@ -592,7 +593,7 @@ elif st.session_state["pagina_atual"] == "Vendas":
             estoque_atual["disponivel"] = estoque_atual["qtd_produzida"] - estoque_atual["qtd_vendida"]
         else:
             estoque_atual = prod_totais.copy()
-            estoque_atual["disponivel"] = estoque_atual["qtd_produzida"]
+            estoque_atual["disponivel"] = estoque_atual["qtd_produz_ida"] if "qtd_produz_ida" in estoque_atual else estoque_atual["qtd_produzida"]
 
         opcoes_venda = {
             f"{row['codigo']} — {row['nome']} (Disponível: {int(row['disponivel'])})": row 

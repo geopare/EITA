@@ -236,12 +236,10 @@ elif st.session_state["pagina_atual"] == "Compras":
             categoria = st.selectbox("Categoria", categorias_lista)
             cor = st.text_input("Cor / Variante (ex: Branco, Azul Silk)").strip().upper()
             quantidade = st.number_input("Quantidade Comprada", min_value=0.01, step=1.0)
-            unidade = st.selectbox("Unidade (KG, UN, Gramas, etc.)", ["KG", "G", "UN", "METROS", "PCT"])
+            unidade = st.selectbox("Unidade (KG, G, UN, METROS, etc.)", ["KG", "G", "UN", "METROS", "PCT"])
 
         with col2:
             nota_fiscal = st.text_input("Número da Nota Fiscal / Pedido").strip()
-            
-            # Opção de fornecedor predefinido ou livre
             fornecedor_opcao = st.selectbox("Fornecedor", ["Amazon", "Online", "Loja física", "Outro"])
             if fornecedor_opcao == "Outro":
                 fornecedor = st.text_input("Digite o nome do fornecedor").strip()
@@ -249,8 +247,6 @@ elif st.session_state["pagina_atual"] == "Compras":
                 fornecedor = fornecedor_opcao
 
             custo_total = st.number_input("Custo Total da Compra (€)", min_value=0.0, step=0.50, format="%.2f")
-            
-            # Cálculo automático ou manual do custo unitário / por grama
             custo_unitario_sugerido = custo_total / quantidade if quantidade > 0 else 0.0
             custo_unitario = st.number_input("Custo da Unidade ou por Grama (€)", min_value=0.0, value=float(custo_unitario_sugerido), step=0.001, format="%.3f")
 
@@ -277,10 +273,26 @@ elif st.session_state["pagina_atual"] == "Compras":
                 time.sleep(1)
                 st.rerun()
 
-    st.markdown("### 📋 Histórico de Compras")
+    st.markdown("### 📋 Histórico de Compras (Gerenciar Itens)")
     if st.session_state["compras"]:
-        df_compras = pd.DataFrame(st.session_state["compras"])
-        st.dataframe(df_compras, use_container_width=True)
+        for idx, compra in enumerate(st.session_state["compras"]):
+            with st.expander(f"🛒 [{compra.get('data')}] {compra.get('nome_material')} - {compra.get('cor')} ({compra.get('quantidade')} {compra.get('unidade')}) - € {compra.get('custo_total'):.2f}"):
+                c_info1, c_info2, c_btn = st.columns([2, 2, 1])
+                with c_info1:
+                    st.write(f"**Categoria:** {compra.get('categoria')}")
+                    st.write(f"**Fornecedor:** {compra.get('fornecedor')}")
+                    st.write(f"**Nota Fiscal:** {compra.get('nota_fiscal')}")
+                with c_info2:
+                    st.write(f"**Custo Total:** € {compra.get('custo_total'):.2f}")
+                    st.write(f"**Custo Unitário:** € {compra.get('custo_unitario'):.3f}")
+                with c_btn:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("🗑️ Excluir", key=f"del_compra_{idx}"):
+                        st.session_state["compras"].pop(idx)
+                        salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], "Compra excluída")
+                        st.success("Compra removida com sucesso!")
+                        time.sleep(1)
+                        st.rerun()
 
 # ==========================================
 # ABA 2: ESTOQUE DE MATERIAIS CONSOLIDADO
@@ -345,9 +357,26 @@ elif st.session_state["pagina_atual"] == "Producao":
                 time.sleep(1)
                 st.rerun()
 
-    st.markdown("### 📋 Histórico de Produção")
+    st.markdown("### 📋 Histórico de Produção (Gerenciar Itens)")
     if st.session_state["producao"]:
-        st.dataframe(pd.DataFrame(st.session_state["producao"]), use_container_width=True)
+        for idx, prod in enumerate(st.session_state["producao"]):
+            with st.expander(f"⚙️ [{prod.get('data')}] {prod.get('codigo')} — {prod.get('nome')} (Qtd: {prod.get('qtd_produzida')})"):
+                c_info1, c_info2, c_btn = st.columns([2, 2, 1])
+                with c_info1:
+                    st.write(f"**Categoria:** {prod.get('categoria')}")
+                    st.write(f"**PLA por Unidade:** {prod.get('pla_por_unidade')}g")
+                    st.write(f"**PLA Total:** {prod.get('pla_total')}g")
+                with c_info2:
+                    st.write(f"**Material Extra:** {prod.get('material_extra')}")
+                    st.write(f"**Custo Unitário:** € {prod.get('custo_unidade'):.2f}")
+                with c_btn:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("🗑️ Excluir", key=f"del_prod_{idx}"):
+                        st.session_state["producao"].pop(idx)
+                        salvar_csv(ARQUIVO_PRODUCAO, st.session_state["producao"], "Produção excluída")
+                        st.success("Produção removida com sucesso!")
+                        time.sleep(1)
+                        st.rerun()
 
 # ==========================================
 # ABA 4: PRODUTOS EM ESTOQUE (ACABADOS)
@@ -389,47 +418,3 @@ elif st.session_state["pagina_atual"] == "Vendas":
     else:
         df_prod = pd.DataFrame(st.session_state["producao"])
         df_vend = pd.DataFrame(st.session_state["vendas"]) if st.session_state["vendas"] else pd.DataFrame(columns=["codigo", "qtd_vendida"])
-        
-        prod_totais = df_prod.groupby(["codigo", "nome", "custo_unidade"], as_index=False).agg({"qtd_produzida": "sum"})
-        if not df_vend.empty and "codigo" in df_vend.columns:
-            vendas_totais = df_vend.groupby("codigo", as_index=False).agg({"qtd_vendida": "sum"})
-            estoque_atual = pd.merge(prod_totais, vendas_totais, on="codigo", how="left").fillna(0)
-            estoque_atual["disponivel"] = estoque_atual["qtd_produzida"] - estoque_atual["qtd_vendida"]
-        else:
-            estoque_atual = prod_totais.copy()
-            estoque_atual["disponivel"] = estoque_atual["qtd_produzida"]
-
-        opcoes_venda = {
-            f"{row['codigo']} — {row['nome']} (Disponível: {int(row['disponivel'])})": row 
-            for _, row in estoque_atual.iterrows() if row["disponivel"] > 0
-        }
-
-        if not opcoes_venda:
-            st.info("Não há produtos com estoque disponível para venda no momento.")
-        else:
-            with st.form("form_venda"):
-                data_venda = st.date_input("Data da Venda")
-                produto_escolhido_chave = st.selectbox("Selecione o Produto", list(opcoes_venda.keys()))
-                prod_selecionado = opcoes_venda[produto_escolhido_chave]
-                
-                qtd_vendida = st.number_input("Quantidade Vendida", min_value=1, max_value=int(prod_selecionado["disponivel"]), step=1)
-                preco_venda_unit = st.number_input("Preço de Venda Unitário (€)", min_value=0.0, value=float(prod_selecionado["custo_unidade"] * 2), step=0.50)
-
-                submitted_venda = st.form_submit_button("Confirmar Venda e Dar Baixa")
-                if submitted_venda:
-                    nova_venda = {
-                        "data": str(data_venda),
-                        "codigo": prod_selecionado["codigo"],
-                        "nome": prod_selecionado["nome"],
-                        "qtd_vendida": int(qtd_vendida),
-                        "valor_total": float(qtd_vendida * preco_venda_unit)
-                    }
-                    st.session_state["vendas"].append(nova_venda)
-                    salvar_csv(ARQUIVO_VENDAS, st.session_state["vendas"], "Venda registrada com baixa de estoque")
-                    st.success("Venda registrada e estoque atualizado com sucesso!")
-                    time.sleep(1)
-                    st.rerun()
-
-    st.markdown("### 📋 Histórico de Vendas")
-    if st.session_state["vendas"]:
-        st.dataframe(pd.DataFrame(st.session_state["vendas"]), use_container_width=True)

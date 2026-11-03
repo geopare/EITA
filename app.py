@@ -135,7 +135,11 @@ def importar_dados_antigos():
 
 # Inicialização do State
 if "compras" not in st.session_state:
-    st.session_state["compras"] = carregar_csv(ARQUIVO_COMPRAS, {"categoria": "", "cor": "", "quantidade": 0.0, "unidade": "KG", "custo_total": 0.0, "fornecedor": ""})
+    st.session_state["compras"] = carregar_csv(ARQUIVO_COMPRAS, {
+        "data": "", "nome_material": "", "categoria": "", "cor": "", 
+        "quantidade": 0.0, "unidade": "KG", "custo_total": 0.0, 
+        "custo_unitario": 0.0, "nota_fiscal": "", "fornecedor": ""
+    })
 
 if "producao" not in st.session_state:
     dados_iniciais_prod = carregar_csv(ARQUIVO_PRODUCAO, {"data": "", "codigo": "", "nome": "", "categoria": "", "qtd_produzida": 0, "pla_por_unidade": 0.0, "pla_total": 0.0, "material_extra": 0.0, "custo_unidade": 0.0})
@@ -227,29 +231,48 @@ elif st.session_state["pagina_atual"] == "Compras":
     with st.form("form_compra"):
         col1, col2 = st.columns(2)
         with col1:
+            data_compra = st.date_input("Data da Compra")
+            nome_material = st.text_input("Nome do Material (ex: Filamento PLA, Argola Chaveiro)").strip()
             categoria = st.selectbox("Categoria", categorias_lista)
-            cor = st.text_input("Cor / Variante (ex: Branco, Azul Silk, 3D Hojor)").strip().upper()
+            cor = st.text_input("Cor / Variante (ex: Branco, Azul Silk)").strip().upper()
             quantidade = st.number_input("Quantidade Comprada", min_value=0.01, step=1.0)
+            unidade = st.selectbox("Unidade (KG, UN, Gramas, etc.)", ["KG", "G", "UN", "METROS", "PCT"])
+
         with col2:
-            unidade = st.selectbox("Unidade Base", ["KG", "UN", "METROS", "PCT"])
-            custo_total = st.number_input("Custo Total (€ ou R$)", min_value=0.0, step=0.50)
-            fornecedor = st.text_input("Fornecedor").strip()
+            nota_fiscal = st.text_input("Número da Nota Fiscal / Pedido").strip()
+            
+            # Opção de fornecedor predefinido ou livre
+            fornecedor_opcao = st.selectbox("Fornecedor", ["Amazon", "Online", "Loja física", "Outro"])
+            if fornecedor_opcao == "Outro":
+                fornecedor = st.text_input("Digite o nome do fornecedor").strip()
+            else:
+                fornecedor = fornecedor_opcao
+
+            custo_total = st.number_input("Custo Total da Compra (€)", min_value=0.0, step=0.50, format="%.2f")
+            
+            # Cálculo automático ou manual do custo unitário / por grama
+            custo_unitario_sugerido = custo_total / quantidade if quantidade > 0 else 0.0
+            custo_unitario = st.number_input("Custo da Unidade ou por Grama (€)", min_value=0.0, value=float(custo_unitario_sugerido), step=0.001, format="%.3f")
 
         submitted = st.form_submit_button("Salvar Compra e Atualizar Estoque")
         if submitted:
-            if not cor:
-                st.error("Informe a cor ou variante do material.")
+            if not nome_material or not cor:
+                st.error("Por favor, preencha o Nome do Material e a Cor/Variante.")
             else:
                 nova_compra = {
+                    "data": str(data_compra),
+                    "nome_material": nome_material,
                     "categoria": categoria,
                     "cor": cor,
                     "quantidade": float(quantidade),
                     "unidade": unidade,
                     "custo_total": float(custo_total),
+                    "custo_unitario": float(custo_unitario),
+                    "nota_fiscal": nota_fiscal,
                     "fornecedor": fornecedor
                 }
                 st.session_state["compras"].append(nova_compra)
-                salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], "Nova compra cadastrada")
+                salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], "Nova compra detalhada cadastrada")
                 st.success("Compra registrada com sucesso!")
                 time.sleep(1)
                 st.rerun()
@@ -275,7 +298,7 @@ elif st.session_state["pagina_atual"] == "EstoqueMateriais":
             "quantidade": "sum",
             "custo_total": "sum"
         })
-        df_agrupado["Custo Unitário Médio"] = df_agrupado["custo_total"] / df_agrupado["quantidade"]
+        df_agrupado["Custo Unitário Médio (€)"] = df_agrupado["custo_total"] / df_agrupado["quantidade"]
 
         st.dataframe(df_agrupado, use_container_width=True)
 
@@ -350,9 +373,9 @@ elif st.session_state["pagina_atual"] == "ProdutosProntos":
             estoque_final = estoque_produzido.copy()
             estoque_final["Estoque Atual"] = estoque_final["qtd_produzida"]
 
-        estoque_final["Valor Total em Estoque"] = estoque_final["Estoque Atual"] * estoque_final["custo_unidade"]
+        estoque_final["Valor Total em Estoque (€)"] = estoque_final["Estoque Atual"] * estoque_final["custo_unidade"]
 
-        st.dataframe(estoque_final[["codigo", "nome", "categoria", "Estoque Atual", "custo_unidade", "Valor Total em Estoque"]], use_container_width=True)
+        st.dataframe(estoque_final[["codigo", "nome", "categoria", "Estoque Atual", "custo_unidade", "Valor Total em Estoque (€)"]], use_container_width=True)
 
 # ==========================================
 # ABA 5: VENDAS (SAÍDAS)

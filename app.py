@@ -358,7 +358,7 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
             categoria_prod = st.selectbox("Categoria", categorias_produtos_lista, index=cat_idx)
 
             prefixo = categoria_prod[:3].upper()
-            prods_cat = [p for p in st.session_state["catalogo"] if p.get("categoria"] == categoria_prod]
+            prods_cat = [p for p in st.session_state["catalogo"] if p.get("categoria") == categoria_prod]
             proximo_numero = len(prods_cat) + 1 if not is_edit_cat else int(item_cat_atual.get("codigo", f"{prefixo}-000").split("-")[-1])
             codigo_auto = item_cat_atual.get("codigo") if is_edit_cat else f"{prefixo}-{proximo_numero:03d}"
 
@@ -382,13 +382,11 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
 
             st.markdown("##### 📸 Imagem do Produto")
             
-            # Opção de escolher entre carregar nova ou buscar foto já existente
             tipo_foto_opcao = st.radio("Origem da Imagem", ["Fazer Upload de Nova", "Escolher Foto Já Salva"], horizontal=True)
             
             upload_foto = None
             foto_selecionada_existente = ""
 
-            # Listar imagens disponíveis na pasta
             imagens_existentes = [f for f in os.listdir(PASTA_IMAGENS) if f.lower().endswith(('png', 'jpg', 'jpeg'))] if os.path.exists(PASTA_IMAGENS) else []
 
             if tipo_foto_opcao == "Fazer Upload de Nova":
@@ -463,7 +461,6 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Controle para mostrar/ocultar catálogo por categoria
     if "mostrar_produtos_catalogo" not in st.session_state:
         st.session_state["mostrar_produtos_catalogo"] = False
 
@@ -504,7 +501,6 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
                                     salvar_csv(ARQUIVO_CATALOGO, st.session_state["catalogo"], "Produto excluído do catálogo")
                                     st.rerun()
                             st.markdown("---")
-
 # ==========================================
 # ABA 4: PRODUÇÃO DIÁRIA
 # ==========================================

@@ -275,14 +275,30 @@ elif st.session_state["pagina_atual"] == "Compras":
                 time.sleep(1)
                 st.rerun()
 
-    st.markdown("### 📋 Histórico de Compras")
-    if st.session_state["compras"]:
-        for idx, compra in enumerate(st.session_state["compras"]):
-            with st.expander(f"🛒 [{compra.get('data')}] ({compra.get('tipo_material')}) {compra.get('nome_material')} - {compra.get('cor')} ({compra.get('quantidade')} {compra.get('unidade')})"):
-                if st.button("🗑️ Excluir Compra", key=f"del_compra_{idx}"):
-                    st.session_state["compras"].pop(idx)
-                    salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], "Compra excluída")
-                    st.rerun()
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Botão para exibir/ocultar o histórico de compras sob demanda
+    if "mostrar_historico_compras" not in st.session_state:
+        st.session_state["mostrar_historico_compras"] = False
+
+    if st.button("📋 Ver Histórico de Compras Cadastradas"):
+        st.session_state["mostrar_historico_compras"] = not st.session_state["mostrar_historico_compras"]
+
+    if st.session_state["mostrar_historico_compras"]:
+        st.markdown("### Histórico de Compras")
+        if st.session_state["compras"]:
+            for idx, compra in enumerate(st.session_state["compras"]):
+                titulo_expander = f"🛒 [{compra.get('data')}] ({compra.get('tipo_material')}) {compra.get('nome_material')} - {compra.get('cor')} ({compra.get('quantidade')} {compra.get('unidade')})"
+                with st.expander(titulo_expander):
+                    st.write(f"• **Fornecedor:** {compra.get('fornecedor')}")
+                    st.write(f"• **Nota Fiscal:** {compra.get('nota_fiscal')}")
+                    st.write(f"• **Custo Total:** € {compra.get('custo_total'):.2f}")
+                    if st.button("🗑️ Excluir Compra", key=f"del_compra_{idx}"):
+                        st.session_state["compras"].pop(idx)
+                        salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], "Compra excluída")
+                        st.rerun()
+        else:
+            st.info("Nenhuma compra registrada ainda.")
 
 # ==========================================
 # ABA 2: ESTOQUE DE MATERIAIS CONSOLIDADO

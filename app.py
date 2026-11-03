@@ -375,12 +375,12 @@ elif st.session_state["pagina_atual"] == "Producao":
     item_prod_atual = st.session_state["producao"][edit_idx_p] if is_edit_prod else {}
 
     # Obter lista de produtos únicos já cadastrados no histórico para seleção rápida
-df_producao_existente = pd.DataFrame(st.session_state["producao"]) if st.session_state["producao"] else pd.DataFrame()
-produtos_unicos_cadastrados = {}
-if not df_producao_existente.empty and "codigo" in df_producao_existente.columns:
-    for _, r in df_producao_existente.drop_duplicates(subset=["codigo"]).iterrows():
-        label_prod = f"{r.get('codigo')} — {r.get('nome')} ({r.get('categoria')})"
-        produtos_unicos_cadastrados[label_prod] = r
+    df_producao_existente = pd.DataFrame(st.session_state["producao"]) if st.session_state["producao"] else pd.DataFrame()
+    produtos_unicos_cadastrados = {}
+    if not df_producao_existente.empty and "codigo" in df_producao_existente.columns:
+        for _, r in df_producao_existente.drop_duplicates(subset=["codigo"]).iterrows():
+            label_prod = f"{r.get('codigo')} — {r.get('nome')} ({r.get('categoria')})"
+            produtos_unicos_cadastrados[label_prod] = r
 
     with st.form("form_producao"):
         col1, col2 = st.columns(2)
@@ -406,8 +406,8 @@ if not df_producao_existente.empty and "codigo" in df_producao_existente.columns
                 nome_prod = st.text_input("Nome do Produto", value=item_prod_atual.get("nome", "")).strip()
                 pla_por_uni_default = float(item_prod_atual.get("pla_por_unidade", 0.0))
                 custo_uni_default = float(item_prod_atual.get("custo_unidade", 0.0))
+                cat_p_atual = item_prod_atual.get("categoria", categorias_lista[0])
 
-            cat_p_atual = item_prod_atual.get("categoria", categorias_lista[0]) if not is_edit_prod else item_prod_atual.get("categoria", categorias_lista[0])
             cat_p_idx = categorias_lista.index(cat_p_atual) if cat_p_atual in categorias_lista else 0
             categoria_prod = st.selectbox("Categoria", categorias_lista, index=cat_p_idx)
 

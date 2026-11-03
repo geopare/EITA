@@ -326,26 +326,23 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
     item_cat_atual = st.session_state["catalogo"][edit_idx_cat] if is_edit_cat else {}
 
     # Mapear custo médio de PLA, NFC e Argolas com base nas Compras
-    custo_g_pla = 0.025  # Valor padrão (€ 0,025/g ~ € 25/kg) caso não haja compras cadastradas
-    custo_unit_nfc = 0.30  # Custo estimado padrão NFC
-    custo_unit_argola = 0.10  # Custo estimado padrão Argola
+    custo_g_pla = 0.025  # Valor padrão (€ 0,025/g ~ € 25/kg)
+    custo_unit_nfc = 0.30  
+    custo_unit_argola = 0.10  
 
     if st.session_state["compras"]:
         df_comp = pd.DataFrame(st.session_state["compras"])
         
-        # Custo do PLA por grama
         pla_comp = df_comp[df_comp["tipo_material"].str.upper() == "PLA"]
         if not pla_comp.empty and pla_comp["quantidade"].sum() > 0:
             total_g = pla_comp.apply(lambda r: r["quantidade"] * 1000 if str(r["unidade"]).upper() == "KG" else r["quantidade"], axis=1).sum()
             if total_g > 0:
                 custo_g_pla = pla_comp["custo_total"].sum() / total_g
 
-        # Custo unitário de NFC
         nfc_comp = df_comp[df_comp["tipo_material"].str.upper() == "NFC"]
         if not nfc_comp.empty and nfc_comp["quantidade"].sum() > 0:
             custo_unit_nfc = nfc_comp["custo_total"].sum() / nfc_comp["quantidade"].sum()
 
-        # Custo unitário de Argolas
         arg_comp = df_comp[df_comp["tipo_material"].str.upper() == "ARGOLA"]
         if not arg_comp.empty and arg_comp["quantidade"].sum() > 0:
             custo_unit_argola = arg_comp["custo_total"].sum() / arg_comp["quantidade"].sum()
@@ -360,9 +357,8 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
             cat_idx = categorias_produtos_lista.index(cat_atual) if cat_atual in categorias_produtos_lista else 0
             categoria_prod = st.selectbox("Categoria", categorias_produtos_lista, index=cat_idx)
 
-            # Gerar código automático com base na categoria
             prefixo = categoria_prod[:3].upper()
-            prods_cat = [p for p in st.session_state["catalogo"] if p.get("categoria") == categoria_prod]
+            prods_cat = [p for p in st.session_state["catalogo"] if p.get("categoria"] == categoria_prod]
             proximo_numero = len(prods_cat) + 1 if not is_edit_cat else int(item_cat_atual.get("codigo", f"{prefixo}-000").split("-")[-1])
             codigo_auto = item_cat_atual.get("codigo") if is_edit_cat else f"{prefixo}-{proximo_numero:03d}"
 
@@ -385,9 +381,25 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
             qtd_nfc = st.number_input("Qtd. Tags NFC", min_value=1, step=1, value=int(item_cat_atual.get("qtd_nfc", 1))) if usar_nfc else 0
 
             st.markdown("##### 📸 Imagem do Produto")
-            upload_foto = st.file_uploader("Selecione uma Imagem", type=["jpg", "jpeg", "png"])
+            
+            # Opção de escolher entre carregar nova ou buscar foto já existente
+            tipo_foto_opcao = st.radio("Origem da Imagem", ["Fazer Upload de Nova", "Escolher Foto Já Salva"], horizontal=True)
+            
+            upload_foto = None
+            foto_selecionada_existente = ""
 
-            # Cálculo de custo estimado
+            # Listar imagens disponíveis na pasta
+            imagens_existentes = [f for f in os.listdir(PASTA_IMAGENS) if f.lower().endswith(('png', 'jpg', 'jpeg'))] if os.path.exists(PASTA_IMAGENS) else []
+
+            if tipo_foto_opcao == "Fazer Upload de Nova":
+                upload_foto = st.file_uploader("Selecione um arquivo de imagem", type=["jpg", "jpeg", "png"])
+            else:
+                if imagens_existentes:
+                    foto_escolhida = st.selectbox("Selecione uma foto já cadastrada", imagens_existentes)
+                    foto_selecionada_existente = os.path.join(PASTA_IMAGENS, foto_escolhida)
+                else:
+                    st.info("Nenhuma foto salva anteriormente na pasta.")
+
             custo_pla_calc = gramas_pla * custo_g_pla
             custo_arg_calc = qtd_argola * custo_unit_argola
             custo_nfc_calc = qtd_nfc * custo_unit_nfc
@@ -400,15 +412,15 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
             if not nome_prod:
                 st.error("Preencha o Nome do Produto.")
             else:
-                # Tratar salvamento da foto
                 caminho_foto = item_cat_atual.get("foto", "")
-                if upload_foto is not None:
+                if tipo_foto_opcao == "Fazer Upload de Nova" and upload_foto is not None:
                     ext = upload_foto.name.split(".")[-1]
                     caminho_foto = os.path.join(PASTA_IMAGENS, f"{codigo_auto}.{ext}")
                     with open(caminho_foto, "wb") as f:
                         f.write(upload_foto.getbuffer())
+                elif tipo_foto_opcao == "Escolher Foto Já Salva" and foto_selecionada_existente:
+                    caminho_foto = foto_selecionada_existente
 
-                # Montar resumo dos insumos
                 insumos_detalhe = [f"{gramas_pla:.0f}g PLA"]
                 if usar_argola:
                     insumos_detalhe.append(f"{qtd_argola}x Argola")
@@ -451,7 +463,7 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Controle para mostrar/ocultar histórico de produtos
+    # Controle para mostrar/ocultar catálogo por categoria
     if "mostrar_produtos_catalogo" not in st.session_state:
         st.session_state["mostrar_produtos_catalogo"] = False
 
@@ -459,35 +471,39 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
         st.session_state["mostrar_produtos_catalogo"] = not st.session_state["mostrar_produtos_catalogo"]
 
     if st.session_state["mostrar_produtos_catalogo"]:
-        st.markdown("### 📋 Seus Produtos Cadastrados")
-        if st.session_state["catalogo"]:
-            for idx, cat in enumerate(st.session_state["catalogo"]):
-                titulo_item = f"🏷️ [{cat.get('codigo')}] {cat.get('nome')} ({cat.get('categoria')})"
-                with st.expander(titulo_item):
-                    col_detalhes, col_img = st.columns([3, 1])
-                    with col_detalhes:
-                        st.write(f"• **Tempo de Impressão:** {cat.get('horas_imp', 0)}h {cat.get('minutos_imp', 0)}min")
-                        st.write(f"• **Peso de PLA:** {cat.get('gramas_pla', 0)} g")
-                        st.write(f"• **Insumos:** {cat.get('insumos')}")
-                        st.write(f"• **Custo Estimado:** € {float(cat.get('custo_estimado', 0.0)):.2f}")
-                    with col_img:
-                        if cat.get("foto") and os.path.exists(cat.get("foto")):
-                            st.image(cat.get("foto"), use_container_width=True)
-                        else:
-                            st.caption("Sem foto")
-
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        if st.button("✏️ Editar", key=f"edit_cat_{idx}"):
-                            st.session_state["edit_idx_catalogo"] = idx
-                            st.rerun()
-                    with c2:
-                        if st.button("🗑️ Excluir", key=f"del_cat_{idx}"):
-                            st.session_state["catalogo"].pop(idx)
-                            salvar_csv(ARQUIVO_CATALOGO, st.session_state["catalogo"], "Produto excluído do catálogo")
-                            st.rerun()
-        else:
+        st.markdown("### 📋 Seus Produtos Cadastrados por Categoria")
+        if not st.session_state["catalogo"]:
             st.info("Nenhum produto cadastrado no catálogo ainda.")
+        else:
+            for cat in categorias_produtos_lista:
+                prods_cat_lista = [(i, p) for i, p in enumerate(st.session_state["catalogo"]) if p.get("categoria") == cat]
+                if prods_cat_lista:
+                    with st.expander(f"📁 **{cat}** ({len(prods_cat_lista)} produtos)"):
+                        for idx, prod in prods_cat_lista:
+                            st.markdown(f"**🏷️ [{prod.get('codigo')}] {prod.get('nome')}**")
+                            col_detalhes, col_img = st.columns([3, 1])
+                            with col_detalhes:
+                                st.write(f"• **Tempo de Impressão:** {prod.get('horas_imp', 0)}h {prod.get('minutos_imp', 0)}min")
+                                st.write(f"• **Peso de PLA:** {prod.get('gramas_pla', 0)} g")
+                                st.write(f"• **Insumos:** {prod.get('insumos')}")
+                                st.write(f"• **Custo Estimado:** € {float(prod.get('custo_estimado', 0.0)):.2f}")
+                            with col_img:
+                                if prod.get("foto") and os.path.exists(prod.get("foto")):
+                                    st.image(prod.get("foto"), use_container_width=True)
+                                else:
+                                    st.caption("Sem foto")
+
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                if st.button("✏️ Editar", key=f"edit_cat_{idx}"):
+                                    st.session_state["edit_idx_catalogo"] = idx
+                                    st.rerun()
+                            with c2:
+                                if st.button("🗑️ Excluir", key=f"del_cat_{idx}"):
+                                    st.session_state["catalogo"].pop(idx)
+                                    salvar_csv(ARQUIVO_CATALOGO, st.session_state["catalogo"], "Produto excluído do catálogo")
+                                    st.rerun()
+                            st.markdown("---")
 
 # ==========================================
 # ABA 4: PRODUÇÃO DIÁRIA

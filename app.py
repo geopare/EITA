@@ -462,4 +462,150 @@ elif st.session_state["pagina_atual"] == "Producao":
                     st.write(f"**PLA Total:** {prod.get('pla_total')}g")
                 with c_info2:
                     st.write(f"**Material Extra:** {prod.get('material_extra')}")
-                    st.write(f"**Custo Unit
+                    st.write(f"**Custo Unitário:** € {prod.get('custo_unidade'):.2f}")
+                with c_btn1:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("✏️ Editar", key=f"edit_prod_{idx}"):
+                        st.session_state["edit_idx_producao"] = idx
+                        st.rerun()
+                with c_btn2:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("🗑️ Excluir", key=f"del_prod_{idx}"):
+                        st.session_state["producao"].pop(idx)
+                        salvar_csv(ARQUIVO_PRODUCAO, st.session_state["producao"], "Produção excluída")
+                        st.success("Produção removida com sucesso!")
+                        time.sleep(1)
+                        st.rerun()
+
+# ==========================================
+# ABA 4: PRODUTOS EM ESTOQUE (ACABADOS)
+# ==========================================
+elif st.session_state["pagina_atual"] == "ProdutosProntos":
+    renderizar_cabecalho("PRODUTOS ACABADOS EM ESTOQUE")
+    st.markdown("---")
+    st.markdown("Lista consolidada de tudo o que foi produzido menos o que já foi vendido.")
+
+    if not st.session_state["producao"]:
+        st.info("Nenhum produto produzido até o momento.")
+    else:
+        df_prod = pd.DataFrame(st.session_state["producao"])
+        df_vend = pd.DataFrame(st.session_state["vendas"]) if st.session_state["vendas"] else pd.DataFrame(columns=["codigo", "qtd_vendida"])
+
+        estoque_produzido = df_prod.groupby(["codigo", "nome", "categoria", "custo_unidade"], as_index=False).agg({"qtd_produzida": "sum"})
+        
+        if not df_vend.empty and "codigo" in df_vend.columns:
+            vendas_agrupadas = df_vend.groupby("codigo", as_index=False).agg({"qtd_vendida": "sum"})
+            estoque_final = pd.merge(estoque_produzido, vendas_agrupadas, on="codigo", how="left").fillna(0)
+            estoque_final["Estoque Atual"] = estoque_final["qtd_produzida"] - estoque_final["qtd_vendida"]
+        else:
+            estoque_final = estoque_produzido.copy()
+            estoque_final["Estoque Atual"] = estoque_final["qtd_produzida"]
+
+        estoque_final["Valor Total em Estoque (€)"] = estoque_final["Estoque Atual"] * estoque_final["custo_unidade"]
+
+        st.dataframe(estoque_final[["codigo", "nome", "categoria", "Estoque Atual", "custo_unidade", "Valor Total em Estoque (€)"]], use_container_width=True)
+
+# ==========================================
+# ABA 5: VENDAS (SAÍDAS)
+# ==========================================
+elif st.session_state["pagina_atual"] == "Vendas":
+    edit_idx_v = st.session_state["edit_idx_venda"]
+    is_edit_venda = edit_idx_v is not None
+    titulo_venda = "EDITAR VENDA" if is_edit_venda else "REGISTRAR VENDAS"
+
+    renderizar_cabecalho(titulo_venda)
+    st.markdown("---")
+
+    if not st.session_state["producao"]:
+        st.warning("Cadastre uma produção antes de registrar vendas.")
+    else:
+        df_prod = pd.DataFrame(st.session_state["producao"])
+        df_vend = pd.DataFrame(st.session_state["vendas"]) if st.session_state["vendas"] else pd.DataFrame(columns=["codigo", "qtd_vendida"])
+        
+        prod_totais = df_prod.groupby(["codigo", "nome", "custo_unidade"], as_index=False).agg({"qtd_produzida": "sum"})
+        if not df_vend.empty and "codigo" in df_vend.columns:
+            vendas_totais = df_vend.groupby("codigo", as_index=False).agg({"qtd_vendida": "sum"})
+            estoque_atual = pd.merge(prod_totais, vendas_totais, on="codigo", how="left").fillna(0)
+            estoque_atual["disponivel"] = estoque_atual["qtd_produzida"] - estoque_atual["qtd_vendida"]
+        else:
+            estoque_atual = prod_totais.copy()
+            estoque_atual["disponivel"] = estoque_atual["qtd_produzida"]
+
+        opcoes_venda = {
+            f"{row['codigo']} — {row['nome']} (Disponível: {int(row['disponivel'])})": row 
+            for _, row in estoque_atual.iterrows() if row["disponivel"] > 0
+        }
+
+        if not opcoes_venda and not is_edit_venda:
+            st.info("Não há produtos com estoque disponível para venda no momento.")
+        else:
+            item_venda_atual = st.session_state["vendas"][edit_idx_v] if is_edit_venda else {}
+
+            with st.form("form_venda"):
+                data_venda = st.date_input("Data da Venda")
+                
+                chaves_opcoes = list(opcoes_venda.keys())
+                default_idx = 0
+                if is_edit_venda:
+                    codigo_editando = item_venda_atual.get("codigo")
+                    for idx_op, ch in enumerate(chaves_opcoes):
+                        if codigo_editando in ch:
+                            default_idx = idx_op
+                            break
+
+                produto_escolhido_chave = st.selectbox("Selecione o Produto", chaves_opcoes, index=default_idx)
+                prod_selecionado = opcoes_venda[produto_escolhido_chave]
+                
+                qtd_venda_atual = int(item_venda_atual.get("qtd_vendida", 1))
+                limite_max = int(prod_selecionado["disponivel"]) + (qtd_venda_atual if is_edit_venda else 0)
+                
+                qtd_vendida = st.number_input("Quantidade Vendida", min_value=1, max_value=limite_max, step=1, value=qtd_venda_atual)
+                
+                preco_sugerido = float(item_venda_atual.get("valor_total", prod_selecionado["custo_unidade"] * 2)) / qtd_venda_atual if is_edit_venda else float(prod_selecionado["custo_unidade"] * 2)
+                preco_venda_unit = st.number_input("Preço de Venda Unitário (€)", min_value=0.0, value=preco_sugerido, step=0.50)
+
+                btn_txt_v = "Salvar Alterações da Venda" if is_edit_venda else "Confirmar Venda e Dar Baixa"
+                submitted_venda = st.form_submit_button(btn_txt_v)
+                
+                if submitted_venda:
+                    nova_venda = {
+                        "data": str(data_venda),
+                        "codigo": prod_selecionado["codigo"],
+                        "nome": prod_selecionado["nome"],
+                        "qtd_vendida": int(qtd_vendida),
+                        "valor_total": float(qtd_vendida * preco_venda_unit)
+                    }
+                    if is_edit_venda:
+                        st.session_state["vendas"][edit_idx_v] = nova_venda
+                        st.session_state["edit_idx_venda"] = None
+                        msg_v = "Venda atualizada com sucesso!"
+                    else:
+                        st.session_state["vendas"].append(nova_venda)
+                        msg_v = "Venda registrada com sucesso!"
+
+                    salvar_csv(ARQUIVO_VENDAS, st.session_state["vendas"], msg_v)
+                    st.success(msg_v)
+                    time.sleep(1)
+                    st.rerun()
+
+    if is_edit_venda:
+        if st.button("❌ Cancelar Edição"):
+            st.session_state["edit_idx_venda"] = None
+            st.rerun()
+
+    st.markdown("### 📋 Histórico de Vendas (Gerenciar Itens)")
+    if st.session_state["vendas"]:
+        for idx, venda in enumerate(st.session_state["vendas"]):
+            with st.expander(f"💸 [{venda.get('data')}] {venda.get('codigo')} — {venda.get('nome')} (Qtd: {venda.get('qtd_vendida')}) - € {venda.get('valor_total'):.2f}"):
+                c_btn1, c_btn2, _ = st.columns([1, 1, 3])
+                with c_btn1:
+                    if st.button("✏️ Editar", key=f"edit_venda_{idx}"):
+                        st.session_state["edit_idx_venda"] = idx
+                        st.rerun()
+                with c_btn2:
+                    if st.button("🗑️ Excluir", key=f"del_venda_{idx}"):
+                        st.session_state["vendas"].pop(idx)
+                        salvar_csv(ARQUIVO_VENDAS, st.session_state["vendas"], "Venda excluída")
+                        st.success("Venda removida com sucesso!")
+                        time.sleep(1)
+                        st.rerun()

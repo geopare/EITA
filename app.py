@@ -150,6 +150,14 @@ if "producao" not in st.session_state:
 if "vendas" not in st.session_state:
     st.session_state["vendas"] = carregar_csv(ARQUIVO_VENDAS, {"data": "", "codigo": "", "nome": "", "qtd_vendida": 0, "valor_total": 0.0})
 
+# Estados de Edição
+if "edit_idx_compra" not in st.session_state:
+    st.session_state["edit_idx_compra"] = None
+if "edit_idx_producao" not in st.session_state:
+    st.session_state["edit_idx_producao"] = None
+if "edit_idx_venda" not in st.session_state:
+    st.session_state["edit_idx_venda"] = None
+
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "Home"
 
@@ -178,18 +186,21 @@ with st.sidebar:
         st.rerun()
     if st.button("🛒 Compras (Entradas)", use_container_width=True):
         st.session_state["pagina_atual"] = "Compras"
+        st.session_state["edit_idx_compra"] = None
         st.rerun()
     if st.button("📦 Estoque de Materiais", use_container_width=True):
         st.session_state["pagina_atual"] = "EstoqueMateriais"
         st.rerun()
     if st.button("⚙️ Produção", use_container_width=True):
         st.session_state["pagina_atual"] = "Producao"
+        st.session_state["edit_idx_producao"] = None
         st.rerun()
     if st.button("🏷️ Produtos Acabados", use_container_width=True):
         st.session_state["pagina_atual"] = "ProdutosProntos"
         st.rerun()
     if st.button("💸 Vendas (Saídas)", use_container_width=True):
         st.session_state["pagina_atual"] = "Vendas"
+        st.session_state["edit_idx_venda"] = None
         st.rerun()
 
 # ==========================================
@@ -205,6 +216,7 @@ if st.session_state["pagina_atual"] == "Home":
     with c1:
         if st.button("🛒 CADASTRAR COMPRA", use_container_width=True):
             st.session_state["pagina_atual"] = "Compras"
+            st.session_state["edit_idx_compra"] = None
             st.rerun()
         if st.button("📦 ESTOQUE DE MATERIAIS", use_container_width=True):
             st.session_state["pagina_atual"] = "EstoqueMateriais"
@@ -212,6 +224,7 @@ if st.session_state["pagina_atual"] == "Home":
     with c2:
         if st.button("⚙️ REGISTRAR PRODUÇÃO", use_container_width=True):
             st.session_state["pagina_atual"] = "Producao"
+            st.session_state["edit_idx_producao"] = None
             st.rerun()
         if st.button("🏷️ PRODUTOS PRONTOS", use_container_width=True):
             st.session_state["pagina_atual"] = "ProdutosProntos"
@@ -219,38 +232,62 @@ if st.session_state["pagina_atual"] == "Home":
     with c3:
         if st.button("💸 REGISTRAR VENDA", use_container_width=True):
             st.session_state["pagina_atual"] = "Vendas"
+            st.session_state["edit_idx_venda"] = None
             st.rerun()
 
 # ==========================================
 # ABA 1: COMPRAS DE MATERIAIS
 # ==========================================
 elif st.session_state["pagina_atual"] == "Compras":
-    renderizar_cabecalho("CADASTRO DE COMPRAS")
+    edit_idx = st.session_state["edit_idx_compra"]
+    is_edit_compra = edit_idx is not None
+    titulo_compra = "EDITAR COMPRA" if is_edit_compra else "CADASTRO DE COMPRAS"
+    
+    renderizar_cabecalho(titulo_compra)
     st.markdown("---")
+
+    item_compra_atual = st.session_state["compras"][edit_idx] if is_edit_compra else {}
 
     with st.form("form_compra"):
         col1, col2 = st.columns(2)
         with col1:
             data_compra = st.date_input("Data da Compra")
-            nome_material = st.text_input("Nome do Material (ex: Filamento PLA, Argola Chaveiro)").strip()
-            categoria = st.selectbox("Categoria", categorias_lista)
-            cor = st.text_input("Cor / Variante (ex: Branco, Azul Silk)").strip().upper()
-            quantidade = st.number_input("Quantidade Comprada", min_value=0.01, step=1.0)
-            unidade = st.selectbox("Unidade (KG, G, UN, METROS, etc.)", ["KG", "G", "UN", "METROS", "PCT"])
+            nome_material = st.text_input("Nome do Material (ex: Filamento PLA)", value=item_compra_atual.get("nome_material", "")).strip()
+            
+            cat_atual = item_compra_atual.get("categoria", categorias_lista[0])
+            cat_idx = categorias_lista.index(cat_atual) if cat_atual in categorias_lista else 0
+            categoria = st.selectbox("Categoria", categorias_lista, index=cat_idx)
+            
+            cor = st.text_input("Cor / Variante (ex: Branco)", value=item_compra_atual.get("cor", "")).strip().upper()
+            quantidade = st.number_input("Quantidade Comprada", min_value=0.01, step=1.0, value=float(item_compra_atual.get("quantidade", 1.0)))
+            
+            unidades_disponiveis = ["KG", "G", "UN", "METROS", "PCT"]
+            un_atual = item_compra_atual.get("unidade", "KG")
+            un_idx = unidades_disponiveis.index(un_atual) if un_atual in unidades_disponiveis else 0
+            unidade = st.selectbox("Unidade", unidades_disponiveis, index=un_idx)
 
         with col2:
-            nota_fiscal = st.text_input("Número da Nota Fiscal / Pedido").strip()
-            fornecedor_opcao = st.selectbox("Fornecedor", ["Amazon", "Online", "Loja física", "Outro"])
-            if fornecedor_opcao == "Outro":
-                fornecedor = st.text_input("Digite o nome do fornecedor").strip()
+            nota_fiscal = st.text_input("Número da Nota Fiscal / Pedido", value=item_compra_atual.get("nota_fiscal", "")).strip()
+            
+            fornecedores_lista = ["Amazon", "Online", "Loja física", "Outro"]
+            forn_atual = item_compra_atual.get("fornecedor", "Amazon")
+            forn_idx = fornecedores_lista.index(forn_atual) if forn_atual in fornecedores_lista else 3
+            
+            fornecedor_opcao = st.selectbox("Fornecedor", fornecedores_lista, index=forn_idx if forn_idx < 3 else 3)
+            if fornecedor_opcao == "Outro" or forn_atual not in fornecedores_lista:
+                fornecedor = st.text_input("Digite o nome do fornecedor", value=forn_atual if forn_atual not in fornecedores_lista else "").strip()
             else:
                 fornecedor = fornecedor_opcao
 
-            custo_total = st.number_input("Custo Total da Compra (€)", min_value=0.0, step=0.50, format="%.2f")
+            custo_total = st.number_input("Custo Total da Compra (€)", min_value=0.0, step=0.50, format="%.2f", value=float(item_compra_atual.get("custo_total", 0.0)))
+            
             custo_unitario_sugerido = custo_total / quantidade if quantidade > 0 else 0.0
-            custo_unitario = st.number_input("Custo da Unidade ou por Grama (€)", min_value=0.0, value=float(custo_unitario_sugerido), step=0.001, format="%.3f")
+            custo_unit_val = float(item_compra_atual.get("custo_unitario", custo_unitario_sugerido))
+            custo_unitario = st.number_input("Custo da Unidade ou por Grama (€)", min_value=0.0, value=custo_unit_val, step=0.001, format="%.3f")
 
-        submitted = st.form_submit_button("Salvar Compra e Atualizar Estoque")
+        btn_texto = "Salvar Alterações da Compra" if is_edit_compra else "Salvar Compra e Atualizar Estoque"
+        submitted = st.form_submit_button(btn_texto)
+        
         if submitted:
             if not nome_material or not cor:
                 st.error("Por favor, preencha o Nome do Material e a Cor/Variante.")
@@ -267,17 +304,29 @@ elif st.session_state["pagina_atual"] == "Compras":
                     "nota_fiscal": nota_fiscal,
                     "fornecedor": fornecedor
                 }
-                st.session_state["compras"].append(nova_compra)
-                salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], "Nova compra detalhada cadastrada")
-                st.success("Compra registrada com sucesso!")
+                if is_edit_compra:
+                    st.session_state["compras"][edit_idx] = nova_compra
+                    st.session_state["edit_idx_compra"] = None
+                    msg = "Compra atualizada com sucesso!"
+                else:
+                    st.session_state["compras"].append(nova_compra)
+                    msg = "Compra registrada com sucesso!"
+                
+                salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], msg)
+                st.success(msg)
                 time.sleep(1)
                 st.rerun()
+
+    if is_edit_compra:
+        if st.button("❌ Cancelar Edição"):
+            st.session_state["edit_idx_compra"] = None
+            st.rerun()
 
     st.markdown("### 📋 Histórico de Compras (Gerenciar Itens)")
     if st.session_state["compras"]:
         for idx, compra in enumerate(st.session_state["compras"]):
             with st.expander(f"🛒 [{compra.get('data')}] {compra.get('nome_material')} - {compra.get('cor')} ({compra.get('quantidade')} {compra.get('unidade')}) - € {compra.get('custo_total'):.2f}"):
-                c_info1, c_info2, c_btn = st.columns([2, 2, 1])
+                c_info1, c_info2, c_btn1, c_btn2 = st.columns([2, 2, 1, 1])
                 with c_info1:
                     st.write(f"**Categoria:** {compra.get('categoria')}")
                     st.write(f"**Fornecedor:** {compra.get('fornecedor')}")
@@ -285,7 +334,12 @@ elif st.session_state["pagina_atual"] == "Compras":
                 with c_info2:
                     st.write(f"**Custo Total:** € {compra.get('custo_total'):.2f}")
                     st.write(f"**Custo Unitário:** € {compra.get('custo_unitario'):.3f}")
-                with c_btn:
+                with c_btn1:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("✏️ Editar", key=f"edit_compra_{idx}"):
+                        st.session_state["edit_idx_compra"] = idx
+                        st.rerun()
+                with c_btn2:
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("🗑️ Excluir", key=f"del_compra_{idx}"):
                         st.session_state["compras"].pop(idx)
@@ -318,23 +372,34 @@ elif st.session_state["pagina_atual"] == "EstoqueMateriais":
 # ABA 3: PRODUÇÃO DIÁRIA
 # ==========================================
 elif st.session_state["pagina_atual"] == "Producao":
-    renderizar_cabecalho("REGISTRO DE PRODUÇÃO")
+    edit_idx_p = st.session_state["edit_idx_producao"]
+    is_edit_prod = edit_idx_p is not None
+    titulo_prod = "EDITAR PRODUÇÃO" if is_edit_prod else "REGISTRO DE PRODUÇÃO"
+
+    renderizar_cabecalho(titulo_prod)
     st.markdown("---")
+
+    item_prod_atual = st.session_state["producao"][edit_idx_p] if is_edit_prod else {}
 
     with st.form("form_producao"):
         col1, col2 = st.columns(2)
         with col1:
             data_prod = st.date_input("Data da Produção")
-            codigo_prod = st.text_input("Código do Produto (SKU)").strip().upper()
-            nome_prod = st.text_input("Nome do Produto").strip()
-            categoria_prod = st.selectbox("Categoria", categorias_lista)
+            codigo_prod = st.text_input("Código do Produto (SKU)", value=item_prod_atual.get("codigo", "")).strip().upper()
+            nome_prod = st.text_input("Nome do Produto", value=item_prod_atual.get("nome", "")).strip()
+            
+            cat_p_atual = item_prod_atual.get("categoria", categorias_lista[0])
+            cat_p_idx = categorias_lista.index(cat_p_atual) if cat_p_atual in categorias_lista else 0
+            categoria_prod = st.selectbox("Categoria", categorias_lista, index=cat_p_idx)
         with col2:
-            qtd_produzida = st.number_input("Quantidade Produzida (unidades)", min_value=1, step=1)
-            pla_por_uni = st.number_input("Consumo de PLA por Unidade (gramas)", min_value=0.0, step=1.0)
-            material_extra = st.number_input("Material Extra Utilizado (TAGs, argolas, etc.)", min_value=0.0, step=1.0)
-            custo_uni = st.number_input("Custo Unitário de Produção (€)", min_value=0.0, step=0.10)
+            qtd_produzida = st.number_input("Quantidade Produzida (unidades)", min_value=1, step=1, value=int(item_prod_atual.get("qtd_produzida", 1)))
+            pla_por_uni = st.number_input("Consumo de PLA por Unidade (gramas)", min_value=0.0, step=1.0, value=float(item_prod_atual.get("pla_por_unidade", 0.0)))
+            material_extra = st.number_input("Material Extra Utilizado (TAGs, argolas, etc.)", min_value=0.0, step=1.0, value=float(item_prod_atual.get("material_extra", 0.0)))
+            custo_uni = st.number_input("Custo Unitário de Produção (€)", min_value=0.0, step=0.10, value=float(item_prod_atual.get("custo_unidade", 0.0)))
 
-        submitted_prod = st.form_submit_button("Registrar Produção e Baixar Estoque")
+        btn_txt_p = "Salvar Alterações da Produção" if is_edit_prod else "Registrar Produção e Baixar Estoque"
+        submitted_prod = st.form_submit_button(btn_txt_p)
+        
         if submitted_prod:
             if not codigo_prod or not nome_prod:
                 st.error("Preencha o código e o nome do produto.")
@@ -351,17 +416,29 @@ elif st.session_state["pagina_atual"] == "Producao":
                     "material_extra": float(material_extra),
                     "custo_unidade": float(custo_uni)
                 }
-                st.session_state["producao"].append(nova_prod)
-                salvar_csv(ARQUIVO_PRODUCAO, st.session_state["producao"], "Nova produção registrada")
-                st.success("Produção registrada e materiais abatidos do estoque!")
+                if is_edit_prod:
+                    st.session_state["producao"][edit_idx_p] = nova_prod
+                    st.session_state["edit_idx_producao"] = None
+                    msg_p = "Produção atualizada com sucesso!"
+                else:
+                    st.session_state["producao"].append(nova_prod)
+                    msg_p = "Produção registrada com sucesso!"
+
+                salvar_csv(ARQUIVO_PRODUCAO, st.session_state["producao"], msg_p)
+                st.success(msg_p)
                 time.sleep(1)
                 st.rerun()
+
+    if is_edit_prod:
+        if st.button("❌ Cancelar Edição"):
+            st.session_state["edit_idx_producao"] = None
+            st.rerun()
 
     st.markdown("### 📋 Histórico de Produção (Gerenciar Itens)")
     if st.session_state["producao"]:
         for idx, prod in enumerate(st.session_state["producao"]):
             with st.expander(f"⚙️ [{prod.get('data')}] {prod.get('codigo')} — {prod.get('nome')} (Qtd: {prod.get('qtd_produzida')})"):
-                c_info1, c_info2, c_btn = st.columns([2, 2, 1])
+                c_info1, c_info2, c_btn1, c_btn2 = st.columns([2, 2, 1, 1])
                 with c_info1:
                     st.write(f"**Categoria:** {prod.get('categoria')}")
                     st.write(f"**PLA por Unidade:** {prod.get('pla_por_unidade')}g")
@@ -369,7 +446,12 @@ elif st.session_state["pagina_atual"] == "Producao":
                 with c_info2:
                     st.write(f"**Material Extra:** {prod.get('material_extra')}")
                     st.write(f"**Custo Unitário:** € {prod.get('custo_unidade'):.2f}")
-                with c_btn:
+                with c_btn1:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("✏️ Editar", key=f"edit_prod_{idx}"):
+                        st.session_state["edit_idx_producao"] = idx
+                        st.rerun()
+                with c_btn2:
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("🗑️ Excluir", key=f"del_prod_{idx}"):
                         st.session_state["producao"].pop(idx)
@@ -410,7 +492,11 @@ elif st.session_state["pagina_atual"] == "ProdutosProntos":
 # ABA 5: VENDAS (SAÍDAS)
 # ==========================================
 elif st.session_state["pagina_atual"] == "Vendas":
-    renderizar_cabecalho("REGISTRAR VENDAS")
+    edit_idx_v = st.session_state["edit_idx_venda"]
+    is_edit_venda = edit_idx_v is not None
+    titulo_venda = "EDITAR VENDA" if is_edit_venda else "REGISTRAR VENDAS"
+
+    renderizar_cabecalho(titulo_venda)
     st.markdown("---")
 
     if not st.session_state["producao"]:
@@ -418,3 +504,36 @@ elif st.session_state["pagina_atual"] == "Vendas":
     else:
         df_prod = pd.DataFrame(st.session_state["producao"])
         df_vend = pd.DataFrame(st.session_state["vendas"]) if st.session_state["vendas"] else pd.DataFrame(columns=["codigo", "qtd_vendida"])
+        
+        prod_totais = df_prod.groupby(["codigo", "nome", "custo_unidade"], as_index=False).agg({"qtd_produzida": "sum"})
+        if not df_vend.empty and "codigo" in df_vend.columns:
+            vendas_totais = df_vend.groupby("codigo", as_index=False).agg({"qtd_vendida": "sum"})
+            estoque_atual = pd.merge(prod_totais, vendas_totais, on="codigo", how="left").fillna(0)
+            estoque_atual["disponivel"] = estoque_atual["qtd_produzida"] - estoque_atual["qtd_vendida"]
+        else:
+            estoque_atual = prod_totais.copy()
+            estoque_atual["disponivel"] = estoque_atual["qtd_produzida"]
+
+        opcoes_venda = {
+            f"{row['codigo']} — {row['nome']} (Disponível: {int(row['disponivel'])})": row 
+            for _, row in estoque_atual.iterrows() if row["disponivel"] > 0
+        }
+
+        if not opcoes_venda and not is_edit_venda:
+            st.info("Não há produtos com estoque disponível para venda no momento.")
+        else:
+            item_venda_atual = st.session_state["vendas"][edit_idx_v] if is_edit_venda else {}
+
+            with st.form("form_venda"):
+                data_venda = st.date_input("Data da Venda")
+                
+                chaves_opcoes = list(opcoes_venda.keys())
+                default_idx = 0
+                if is_edit_venda:
+                    codigo_editando = item_venda_atual.get("codigo")
+                    for idx_op, ch in enumerate(chaves_opcoes):
+                        if codigo_editando in ch:
+                            default_idx = idx_op
+                            break
+
+                produto_escolhido_chave = st.selectbox

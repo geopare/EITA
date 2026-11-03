@@ -161,7 +161,7 @@ if "edit_idx_venda" not in st.session_state:
 if "pagina_atual" not in st.session_state:
     st.session_state["pagina_atual"] = "Home"
 
-categorias_lista = ["PLA", "TAG", "Papelaria", "Decoração", "Utilitários", "Acessórios", "Outros"]
+categorias_lista = ["Decoração", "Utilitários", "Miniaturas", "Laços", "Acessórios", "Organização", "Natal", "Religiao", "PLA", "TAG", "Papelaria", "Outros"]
 
 def renderizar_cabecalho(titulo):
     col1, col2 = st.columns([4, 1])
@@ -374,21 +374,51 @@ elif st.session_state["pagina_atual"] == "Producao":
 
     item_prod_atual = st.session_state["producao"][edit_idx_p] if is_edit_prod else {}
 
+    # Obter lista de produtos únicos já cadastrados no histórico para seleção rápida
+df_producao_existente = pd.DataFrame(st.session_state["producao"]) if st.session_state["producao"] else pd.DataFrame()
+produtos_unicos_cadastrados = {}
+if not df_producao_existente.empty and "codigo" in df_producao_existente.columns:
+    for _, r in df_producao_existente.drop_duplicates(subset=["codigo"]).iterrows():
+        label_prod = f"{r.get('codigo')} — {r.get('nome')} ({r.get('categoria')})"
+        produtos_unicos_cadastrados[label_prod] = r
+
     with st.form("form_producao"):
         col1, col2 = st.columns(2)
         with col1:
             data_prod = st.date_input("Data da Produção")
-            codigo_prod = st.text_input("Código do Produto (SKU)", value=item_prod_atual.get("codigo", "")).strip().upper()
-            nome_prod = st.text_input("Nome do Produto", value=item_prod_atual.get("nome", "")).strip()
             
-            cat_p_atual = item_prod_atual.get("categoria", categorias_lista[0])
+            # Opção de selecionar produto já cadastrado ou criar novo
+            modo_cadastro = st.radio("Origem do Produto", ["Selecionar produto já cadastrado", "Cadastrar novo produto"], horizontal=True)
+            
+            if modo_cadastro == "Selecionar produto já cadastrado" and produtos_unicos_cadastrados:
+                prod_escolhido_combo = st.selectbox("Escolha o Produto", list(produtos_unicos_cadastrados.keys()))
+                dados_selecionados = produtos_unicos_cadastrados[prod_escolhido_combo]
+                
+                codigo_prod = dados_selecionados.get("codigo")
+                nome_prod = dados_selecionados.get("nome")
+                cat_p_atual = dados_selecionados.get("categoria")
+                pla_por_uni_default = float(dados_selecionados.get("pla_por_unidade", 0.0))
+                custo_uni_default = float(dados_selecionados.get("custo_unidade", 0.0))
+                
+                st.info(f"Selecionado: **{codigo_prod} - {nome_prod}**")
+            else:
+                codigo_prod = st.text_input("Código do Produto (SKU)", value=item_prod_atual.get("codigo", "")).strip().upper()
+                nome_prod = st.text_input("Nome do Produto", value=item_prod_atual.get("nome", "")).strip()
+                pla_por_uni_default = float(item_prod_atual.get("pla_por_unidade", 0.0))
+                custo_uni_default = float(item_prod_atual.get("custo_unidade", 0.0))
+
+            cat_p_atual = item_prod_atual.get("categoria", categorias_lista[0]) if not is_edit_prod else item_prod_atual.get("categoria", categorias_lista[0])
             cat_p_idx = categorias_lista.index(cat_p_atual) if cat_p_atual in categorias_lista else 0
             categoria_prod = st.selectbox("Categoria", categorias_lista, index=cat_p_idx)
+
         with col2:
             qtd_produzida = st.number_input("Quantidade Produzida (unidades)", min_value=1, step=1, value=int(item_prod_atual.get("qtd_produzida", 1)))
-            pla_por_uni = st.number_input("Consumo de PLA por Unidade (gramas)", min_value=0.0, step=1.0, value=float(item_prod_atual.get("pla_por_unidade", 0.0)))
-            material_extra = st.number_input("Material Extra Utilizado (TAGs, argolas, etc.)", min_value=0.0, step=1.0, value=float(item_prod_atual.get("material_extra", 0.0)))
-            custo_uni = st.number_input("Custo Unitário de Produção (€)", min_value=0.0, step=0.10, value=float(item_prod_atual.get("custo_unidade", 0.0)))
+            pla_por_uni = st.number_input("Consumo de PLA por Unidade (gramas)", min_value=0.0, step=1.0, value=pla_por_uni_default)
+            
+            # Campo detalhado para gastos extras (Argolas de chaveiro, tags, etc.)
+            material_extra = st.number_input("Gastos Extras / Insumos por Unidade (€) [Ex: argolas, tags, embalagens]", min_value=0.0, step=0.05, value=float(item_prod_atual.get("material_extra", 0.0)), format="%.2f")
+            
+            custo_uni = st.number_input("Custo Unitário de Produção (€)", min_value=0.0, step=0.10, value=custo_uni_default)
 
         btn_txt_p = "Salvar Alterações da Produção" if is_edit_prod else "Registrar Produção e Baixar Estoque"
         submitted_prod = st.form_submit_button(btn_txt_p)
@@ -427,31 +457,37 @@ elif st.session_state["pagina_atual"] == "Producao":
             st.session_state["edit_idx_producao"] = None
             st.rerun()
 
-    st.markdown("### 📋 Histórico de Produção (Gerenciar Itens)")
-    if st.session_state["producao"]:
-        for idx, prod in enumerate(st.session_state["producao"]):
-            with st.expander(f"⚙️ [{prod.get('data')}] {prod.get('codigo')} — {prod.get('nome')} (Qtd: {prod.get('qtd_produzida')})"):
-                c_info1, c_info2, c_btn1, c_btn2 = st.columns([2, 2, 1, 1])
-                with c_info1:
-                    st.write(f"**Categoria:** {prod.get('categoria')}")
-                    st.write(f"**PLA por Unidade:** {prod.get('pla_por_unidade')}g")
-                    st.write(f"**PLA Total:** {prod.get('pla_total')}g")
-                with c_info2:
-                    st.write(f"**Material Extra:** {prod.get('material_extra')}")
-                    st.write(f"**Custo Unitário:** € {prod.get('custo_unidade'):.2f}")
-                with c_btn1:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("✏️ Editar", key=f"edit_prod_{idx}"):
-                        st.session_state["edit_idx_producao"] = idx
-                        st.rerun()
-                with c_btn2:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("🗑️ Excluir", key=f"del_prod_{idx}"):
-                        st.session_state["producao"].pop(idx)
-                        salvar_csv(ARQUIVO_PRODUCAO, st.session_state["producao"], "Produção excluída")
-                        st.success("Produção removida com sucesso!")
-                        time.sleep(1)
-                        st.rerun()
+    st.markdown("### 📋 Histórico de Produção por Categoria")
+    if not st.session_state["producao"]:
+        st.info("Nenhuma produção registrada até o momento.")
+    else:
+        # Organizar o histórico dividido por categorias com expansores
+        for cat in categorias_lista:
+            prods_desta_cat = [(idx_g, p) for idx_g, p in enumerate(st.session_state["producao"]) if p.get("categoria") == cat]
+            
+            if prods_desta_cat:
+                with st.expander(f"📁 **{cat}** ({len(prods_desta_cat)} registros)"):
+                    for idx_global, prod in prods_desta_cat:
+                        st.markdown(f"**[{prod.get('data')}] {prod.get('codigo')} — {prod.get('nome')}** (Qtd: {prod.get('qtd_produzida')} un.)")
+                        c_info1, c_info2, c_btn1, c_btn2 = st.columns([2, 2, 1, 1])
+                        with c_info1:
+                            st.write(f"• PLA por Unidade: {prod.get('pla_por_unidade')}g")
+                            st.write(f"• PLA Total: {prod.get('pla_total')}g")
+                        with c_info2:
+                            st.write(f"• Extra / Insumo: € {float(prod.get('material_extra', 0.0)):.2f}")
+                            st.write(f"• Custo Unitário: € {float(prod.get('custo_unidade', 0.0)):.2f}")
+                        with c_btn1:
+                            if st.button("✏️ Editar", key=f"edit_prod_{idx_global}"):
+                                st.session_state["edit_idx_producao"] = idx_global
+                                st.rerun()
+                        with c_btn2:
+                            if st.button("🗑️ Excluir", key=f"del_prod_{idx_global}"):
+                                st.session_state["producao"].pop(idx_global)
+                                salvar_csv(ARQUIVO_PRODUCAO, st.session_state["producao"], "Produção excluída")
+                                st.success("Produção removida com sucesso!")
+                                time.sleep(1)
+                                st.rerun()
+                        st.markdown("---")
 
 # ==========================================
 # ABA 4: PRODUTOS EM ESTOQUE (ACABADOS)

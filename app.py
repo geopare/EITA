@@ -138,7 +138,7 @@ if "compras" not in st.session_state:
     st.session_state["compras"] = carregar_csv(ARQUIVO_COMPRAS, {
         "data": "", "nome_material": "", "categoria": "", "cor": "", 
         "quantidade": 0.0, "unidade": "KG", "custo_total": 0.0, 
-        "custo_unitario": 0.0, "nota_fiscal": "", "fornecedor": ""
+        "nota_fiscal": "", "fornecedor": ""
     })
 
 if "producao" not in st.session_state:
@@ -280,22 +280,6 @@ elif st.session_state["pagina_atual"] == "Compras":
                 fornecedor = fornecedor_opcao
 
             custo_total = st.number_input("Custo Total da Compra (€)", min_value=0.0, step=0.50, format="%.2f", value=float(item_compra_atual.get("custo_total", 0.0)))
-            
-            # Cálculo automático conforme regra solicitada:
-            # Se KG -> divide o custo total por (quantidade * 1000) para achar o custo por grama, ou se a quantidade já estiver em KG, custo_total / (quantidade * 1000)
-            # Se UN -> custo_total / quantidade
-            if unidade == "KG" and quantidade > 0:
-                custo_unitario_sugerido = custo_total / (quantidade * 1000) # Custo por grama
-                rotulo_custo_unit = "Custo por Grama (€/g)"
-            elif unidade == "UN" and quantidade > 0:
-                custo_unitario_sugerido = custo_total / quantidade # Custo por unidade
-                rotulo_custo_unit = "Custo por Unidade (€/un)"
-            else:
-                custo_unitario_sugerido = custo_total / quantidade if quantidade > 0 else 0.0
-                rotulo_custo_unit = "Custo Unitário / por Grama (€)"
-
-            custo_unit_val = float(item_compra_atual.get("custo_unitario", custo_unitario_sugerido))
-            custo_unitario = st.number_input(rotulo_custo_unit, min_value=0.0, value=custo_unit_val, step=0.001, format="%.4f")
 
         btn_texto = "Salvar Alterações da Compra" if is_edit_compra else "Salvar Compra e Atualizar Estoque"
         submitted = st.form_submit_button(btn_texto)
@@ -312,7 +296,6 @@ elif st.session_state["pagina_atual"] == "Compras":
                     "quantidade": float(quantidade),
                     "unidade": unidade,
                     "custo_total": float(custo_total),
-                    "custo_unitario": float(custo_unitario),
                     "nota_fiscal": nota_fiscal,
                     "fornecedor": fornecedor
                 }
@@ -345,8 +328,6 @@ elif st.session_state["pagina_atual"] == "Compras":
                     st.write(f"**Nota Fiscal:** {compra.get('nota_fiscal')}")
                 with c_info2:
                     st.write(f"**Custo Total:** € {compra.get('custo_total'):.2f}")
-                    tipo_custo = "por Grama" if compra.get('unidade') == 'KG' else "por Unidade"
-                    st.write(f"**Custo {tipo_custo}:** € {compra.get('custo_unitario'):.4f}")
                 with c_btn1:
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("✏️ Editar", key=f"edit_compra_{idx}"):
@@ -367,7 +348,7 @@ elif st.session_state["pagina_atual"] == "Compras":
 elif st.session_state["pagina_atual"] == "EstoqueMateriais":
     renderizar_cabecalho("ESTOQUE DE MATERIAIS CONSOLIDADO")
     st.markdown("---")
-    st.markdown("O sistema consolida automaticamente compras da mesma categoria e cor, somando as quantidades e recalculando os custos.")
+    st.markdown("O sistema consolida automaticamente compras da mesma categoria e cor, somando as quantidades e os custos totais.")
 
     if not st.session_state["compras"]:
         st.info("Nenhuma compra registrada ainda.")
@@ -377,11 +358,6 @@ elif st.session_state["pagina_atual"] == "EstoqueMateriais":
             "quantidade": "sum",
             "custo_total": "sum"
         })
-        # Recalcular a média ponderada do custo unitário/por grama de forma correta
-        df_agrupado["Custo Unitário / por Grama Médio (€)"] = df_agrupado.apply(
-            lambda r: (r["custo_total"] / (r["quantidade"] * 1000)) if r["unidade"] == "KG" and r["quantidade"] > 0 
-            else (r["custo_total"] / r["quantidade"] if r["quantidade"] > 0 else 0), axis=1
-        )
 
         st.dataframe(df_agrupado, use_container_width=True)
 

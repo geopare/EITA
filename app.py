@@ -499,31 +499,27 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
                                 st.write(f"• **Insumos:** {prod.get('insumos')}")
                                 st.write(f"• **Custo Estimado:** € {float(prod.get('custo_estimado', 0.0)):.2f}")
                             
-                            with col_img:
-                                foto_path = str(prod.get("foto", ""))
-                                codigo_prod = str(prod.get("codigo", ""))
-                                foto_encontrada = ""
-                                
-                                # Lista de tentativas únicas
-                                tentativas = []
-                                if foto_path:
-                                    tentativas.append(foto_path)
-                                    if not foto_path.startswith("imagens/"):
-                                        tentativas.append(os.path.join(PASTA_IMAGENS, foto_path))
-                                
-                                if codigo_prod:
-                                    for ext in ["jpg", "jpeg", "png", "JPG", "JPEG", "PNG"]:
-                                        tentativas.append(os.path.join(PASTA_IMAGENS, f"{codigo_prod}.{ext}"))
-                                        tentativas.append(os.path.join(PASTA_IMAGENS, f"{codigo_prod.lower()}.{ext}"))
+                           with col_img:
+                                foto_path = str(prod.get("foto", "")).strip()
+                                codigo_prod = str(prod.get("codigo", "")).strip()
+                                foto_final = None
 
-                                # Pega APENAS a primeira imagem válida que encontrar e encerra a busca
-                                for t in tentativas:
-                                    if t and os.path.exists(t):
-                                        foto_encontrada = t
-                                        break  # Para na primeira para evitar duplicidade!
+                                # 1. Tenta usar o caminho salvo se ele existir de verdade
+                                if foto_path and os.path.exists(foto_path):
+                                    foto_final = foto_path
+                                else:
+                                    # 2. Se não tiver no caminho salvo, procura na pasta 'imagens' pelo código
+                                    if os.path.exists(PASTA_IMAGENS):
+                                        for arq in os.listdir(PASTA_IMAGENS):
+                                            if arq.lower().startswith(codigo_prod.lower() + "."):
+                                                candidato = os.path.join(PASTA_IMAGENS, arq)
+                                                if os.path.exists(candidato):
+                                                    foto_final = candidato
+                                                    break # Encontrou a única imagem e para o loop imediatamente
 
-                                if foto_encontrada:
-                                    st.image(foto_encontrada, use_container_width=True)
+                                # Exibe a foto apenas uma única vez, garantindo que não haja duplicidade
+                                if foto_final:
+                                    st.image(foto_final, use_container_width=True)
                                 else:
                                     st.caption("Sem foto")
                                 

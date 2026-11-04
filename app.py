@@ -118,7 +118,6 @@ def importar_dados_antigos():
             df_antigo = pd.read_csv(ARQUIVO_ANTIGO)
             produtos_convertidos = []
             for _, row in df_antigo.iterrows():
-                # Calcula horas e minutos aproximados com base na coluna 'tempo'
                 tempo_total = float(row.get("tempo", 0.0))
                 horas = int(tempo_total)
                 minutos = int(round((tempo_total - horas) * 60))
@@ -136,7 +135,7 @@ def importar_dados_antigos():
                     "qtd_nfc": 1,
                     "insumos": f"{float(row.get('material', 0.0)):.0f}g PLA",
                     "custo_estimado": float(row.get("producao", 0.0)),
-                    "foto": str(row.get("imagem", ""))  # Pega o caminho exato da imagem do arquivo antigo!
+                    "foto": str(row.get("imagem", ""))
                 })
             return produtos_convertidos
         except Exception as e:
@@ -332,19 +331,25 @@ elif st.session_state["pagina_atual"] == "EstoqueMateriais":
 # ABA 3: CATÁLOGO DE PRODUTOS (O que a EITA faz)
 # ==========================================
 elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
+    # Garante que as chaves de estado essenciais existam
+    if "mostrar_produtos_catalogo" not in st.session_state:
+        st.session_state["mostrar_produtos_catalogo"] = False
+    if "edit_idx_catalogo" not in st.session_state:
+        st.session_state["edit_idx_catalogo"] = None
+
     edit_idx_cat = st.session_state["edit_idx_catalogo"]
     is_edit_cat = edit_idx_cat is not None
     renderizar_cabecalho("EDITAR PRODUTO" if is_edit_cat else "CADASTRO DE PRODUTOS (CATÁLOGO)")
     st.markdown("---")
 
-    item_cat_atual = st.session_state["catalogo"][edit_idx_cat] if is_edit_cat else {}
+    item_cat_atual = st.session_state["catalogo"][edit_idx_cat] if is_edit_cat and edit_idx_cat < len(st.session_state["catalogo"]) else {}
 
     # Mapear custo médio de PLA, NFC e Argolas com base nas Compras
-    custo_g_pla = 0.025  # Valor padrão (€ 0,025/g ~ € 25/kg)
+    custo_g_pla = 0.025  
     custo_unit_nfc = 0.30  
     custo_unit_argola = 0.10  
 
-    if st.session_state["compras"]:
+    if st.session_state.get("compras"):
         df_comp = pd.DataFrame(st.session_state["compras"])
         
         pla_comp = df_comp[df_comp["tipo_material"].str.upper() == "PLA"]
@@ -373,7 +378,7 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
 
             prefixo = categoria_prod[:3].upper()
             prods_cat = [p for p in st.session_state["catalogo"] if p.get("categoria") == categoria_prod]
-            proximo_numero = len(prods_cat) + 1 if not is_edit_cat else int(item_cat_atual.get("codigo", f"{prefixo}-000").split("-")[-1])
+            proximo_numero = len(prods_cat) + 1 if not is_edit_cat else int(str(item_cat_atual.get("codigo", f"{prefixo}-000")).split("-")[-1])
             codigo_auto = item_cat_atual.get("codigo") if is_edit_cat else f"{prefixo}-{proximo_numero:03d}"
 
             st.text_input("Código do Produto (Gerado Automático)", value=codigo_auto, disabled=True)
@@ -427,6 +432,7 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
                 caminho_foto = item_cat_atual.get("foto", "")
                 if tipo_foto_opcao == "Fazer Upload de Nova" and upload_foto is not None:
                     ext = upload_foto.name.split(".")[-1]
+                    os.makedirs(PASTA_IMAGENS, exist_ok=True)
                     caminho_foto = os.path.join(PASTA_IMAGENS, f"{codigo_auto}.{ext}")
                     with open(caminho_foto, "wb") as f:
                         f.write(upload_foto.getbuffer())
@@ -474,7 +480,11 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
             st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
-if st.session_state["mostrar_produtos_catalogo"]:
+
+    if st.button("📋 Ver Produtos Cadastrados no Catálogo"):
+        st.session_state["mostrar_produtos_catalogo"] = not st.session_state["mostrar_produtos_catalogo"]
+
+    if st.session_state["mostrar_produtos_catalogo"]:
         st.markdown("### 📋 Seus Produtos Cadastrados por Categoria")
         if not st.session_state["catalogo"]:
             st.info("Nenhum produto cadastrado no catálogo ainda.")
@@ -525,6 +535,7 @@ if st.session_state["mostrar_produtos_catalogo"]:
                                     salvar_csv(ARQUIVO_CATALOGO, st.session_state["catalogo"], "Produto excluído do catálogo")
                                     st.rerun()
                             st.markdown("---")
+                            
 # ==========================================
 # ABA 4: PRODUÇÃO DIÁRIA
 # ==========================================

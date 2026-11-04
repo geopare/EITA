@@ -484,9 +484,23 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
                                 st.write(f"• **Peso de PLA:** {prod.get('gramas_pla', 0)} g")
                                 st.write(f"• **Insumos:** {prod.get('insumos')}")
                                 st.write(f"• **Custo Estimado:** € {float(prod.get('custo_estimado', 0.0)):.2f}")
+                            
                             with col_img:
-                                if prod.get("foto") and os.path.exists(prod.get("foto")):
-                                    st.image(prod.get("foto"), use_container_width=True)
+                                foto_path = prod.get("foto", "")
+                                codigo_prod = prod.get("codigo", "")
+                                foto_encontrada = ""
+                                
+                                if foto_path and os.path.exists(foto_path):
+                                    foto_encontrada = foto_path
+                                else:
+                                    for ext in ["jpg", "jpeg", "png", "JPG", "JPEG", "PNG"]:
+                                        caminho_tentativa = os.path.join(PASTA_IMAGENS, f"{codigo_prod}.{ext}")
+                                        if os.path.exists(caminho_tentativa):
+                                            foto_encontrada = caminho_tentativa
+                                            break
+
+                                if foto_encontrada:
+                                    st.image(foto_encontrada, use_container_width=True)
                                 else:
                                     st.caption("Sem foto")
 

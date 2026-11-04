@@ -486,18 +486,28 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
                                 st.write(f"• **Custo Estimado:** € {float(prod.get('custo_estimado', 0.0)):.2f}")
                             
                             with col_img:
-                                foto_path = prod.get("foto", "")
-                                codigo_prod = prod.get("codigo", "")
+                                foto_path = str(prod.get("foto", ""))
+                                codigo_prod = str(prod.get("codigo", ""))
                                 foto_encontrada = ""
                                 
-                                if foto_path and os.path.exists(foto_path):
-                                    foto_encontrada = foto_path
-                                else:
-                                    for ext in ["jpg", "jpeg", "png", "JPG", "JPEG", "PNG"]:
-                                        caminho_tentativa = os.path.join(PASTA_IMAGENS, f"{codigo_prod}.{ext}")
-                                        if os.path.exists(caminho_tentativa):
-                                            foto_encontrada = caminho_tentativa
-                                            break
+                                # Lista de possíveis caminhos onde a foto pode estar
+                                tentativas = []
+                                if foto_path:
+                                    tentativas.append(foto_path)
+                                    # Se o caminho salvo não tiver a pasta 'imagens/', tenta adicionar
+                                    if not foto_path.startswith("imagens/"):
+                                        tentativas.append(os.path.join(PASTA_IMAGENS, foto_path))
+                                
+                                # Tenta buscar direto pelo código do produto com várias extensões
+                                for ext in ["jpg", "jpeg", "png", "JPG", "JPEG", "PNG"]:
+                                    tentativas.append(os.path.join(PASTA_IMAGENS, f"{codigo_prod}.{ext}"))
+                                    tentativas.append(os.path.join(PASTA_IMAGENS, f"{codigo_prod.lower()}.{ext}"))
+
+                                # Testa cada tentativa até achar um arquivo que realmente exista no disco
+                                for t in tentativas:
+                                    if t and os.path.exists(t):
+                                        foto_encontrada = t
+                                        break
 
                                 if foto_encontrada:
                                     st.image(foto_encontrada, use_container_width=True)

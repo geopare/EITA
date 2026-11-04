@@ -474,14 +474,7 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
             st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    if "mostrar_produtos_catalogo" not in st.session_state:
-        st.session_state["mostrar_produtos_catalogo"] = False
-
-    if st.button("📋 Ver Produtos Cadastrados no Catálogo"):
-        st.session_state["mostrar_produtos_catalogo"] = not st.session_state["mostrar_produtos_catalogo"]
-
-    if st.session_state["mostrar_produtos_catalogo"]:
+if st.session_state["mostrar_produtos_catalogo"]:
         st.markdown("### 📋 Seus Produtos Cadastrados por Categoria")
         if not st.session_state["catalogo"]:
             st.info("Nenhum produto cadastrado no catálogo ainda.")
@@ -493,57 +486,31 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
                         for idx, prod in prods_cat_lista:
                             st.markdown(f"**🏷️ [{prod.get('codigo')}] {prod.get('nome')}**")
                             col_detalhes, col_img = st.columns([3, 1])
+                            
                             with col_detalhes:
                                 st.write(f"• **Tempo de Impressão:** {prod.get('horas_imp', 0)}h {prod.get('minutos_imp', 0)}min")
                                 st.write(f"• **Peso de PLA:** {prod.get('gramas_pla', 0)} g")
                                 st.write(f"• **Insumos:** {prod.get('insumos')}")
                                 st.write(f"• **Custo Estimado:** € {float(prod.get('custo_estimado', 0.0)):.2f}")
                             
-                           with col_img:
+                            with col_img:
                                 foto_path = str(prod.get("foto", "")).strip()
                                 codigo_prod = str(prod.get("codigo", "")).strip()
                                 foto_final = None
 
-                                # 1. Tenta usar o caminho salvo se ele existir de verdade
                                 if foto_path and os.path.exists(foto_path):
                                     foto_final = foto_path
                                 else:
-                                    # 2. Se não tiver no caminho salvo, procura na pasta 'imagens' pelo código
                                     if os.path.exists(PASTA_IMAGENS):
                                         for arq in os.listdir(PASTA_IMAGENS):
                                             if arq.lower().startswith(codigo_prod.lower() + "."):
                                                 candidato = os.path.join(PASTA_IMAGENS, arq)
                                                 if os.path.exists(candidato):
                                                     foto_final = candidato
-                                                    break # Encontrou a única imagem e para o loop imediatamente
+                                                    break
 
-                                # Exibe a foto apenas uma única vez, garantindo que não haja duplicidade
                                 if foto_final:
                                     st.image(foto_final, use_container_width=True)
-                                else:
-                                    st.caption("Sem foto")
-                                
-                                # Lista de possíveis caminhos onde a foto pode estar
-                                tentativas = []
-                                if foto_path:
-                                    tentativas.append(foto_path)
-                                    # Se o caminho salvo não tiver a pasta 'imagens/', tenta adicionar
-                                    if not foto_path.startswith("imagens/"):
-                                        tentativas.append(os.path.join(PASTA_IMAGENS, foto_path))
-                                
-                                # Tenta buscar direto pelo código do produto com várias extensões
-                                for ext in ["jpg", "jpeg", "png", "JPG", "JPEG", "PNG"]:
-                                    tentativas.append(os.path.join(PASTA_IMAGENS, f"{codigo_prod}.{ext}"))
-                                    tentativas.append(os.path.join(PASTA_IMAGENS, f"{codigo_prod.lower()}.{ext}"))
-
-                                # Testa cada tentativa até achar um arquivo que realmente exista no disco
-                                for t in tentativas:
-                                    if t and os.path.exists(t):
-                                        foto_encontrada = t
-                                        break
-
-                                if foto_encontrada:
-                                    st.image(foto_encontrada, use_container_width=True)
                                 else:
                                     st.caption("Sem foto")
 

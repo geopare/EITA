@@ -504,6 +504,7 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
                                 codigo_prod = str(prod.get("codigo", ""))
                                 foto_encontrada = ""
                                 
+                                # Lista de tentativas únicas
                                 tentativas = []
                                 if foto_path:
                                     tentativas.append(foto_path)
@@ -515,10 +516,11 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
                                         tentativas.append(os.path.join(PASTA_IMAGENS, f"{codigo_prod}.{ext}"))
                                         tentativas.append(os.path.join(PASTA_IMAGENS, f"{codigo_prod.lower()}.{ext}"))
 
+                                # Pega APENAS a primeira imagem válida que encontrar e encerra a busca
                                 for t in tentativas:
                                     if t and os.path.exists(t):
                                         foto_encontrada = t
-                                        break
+                                        break  # Para na primeira para evitar duplicidade!
 
                                 if foto_encontrada:
                                     st.image(foto_encontrada, use_container_width=True)

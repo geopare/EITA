@@ -15,7 +15,7 @@ ARQUIVO_CATALOGO = "catalogo_produtos.csv"
 os.makedirs(PASTA_IMAGENS, exist_ok=True)
 
 # Lista de categorias padrão
-categorias_produtos_lista = ["Decoração", "Natal", "Utilidades", "Brinquedos", "Outros"]
+categorias_produtos_lista = ["Decoração", "Natal", "Utilidades", "Brinquedos", "Chaveiros", "Outros"]
 
 # ==========================================
 # FUNÇÕES COM CACHE (Evita lentidão/travamento)

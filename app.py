@@ -118,15 +118,29 @@ def importar_dados_antigos():
             df_antigo = pd.read_csv(ARQUIVO_ANTIGO)
             produtos_convertidos = []
             for _, row in df_antigo.iterrows():
+                # Calcula horas e minutos aproximados com base na coluna 'tempo'
+                tempo_total = float(row.get("tempo", 0.0))
+                horas = int(tempo_total)
+                minutos = int(round((tempo_total - horas) * 60))
+                
                 produtos_convertidos.append({
                     "codigo": str(row.get("codigo", "SKU-001")),
                     "nome": str(row.get("nome", "Produto Antigo")),
                     "categoria": str(row.get("categoria", "Outros")),
-                    "insumos": f"PLA: {float(row.get('material', 0.0))}g",
-                    "custo_estimado": float(row.get("producao", 0.0)) if "producao" in row else 0.0
+                    "horas_imp": horas,
+                    "minutos_imp": minutos,
+                    "gramas_pla": float(row.get("material", 0.0)),
+                    "usar_argola": False,
+                    "qtd_argola": 1,
+                    "usar_nfc": False,
+                    "qtd_nfc": 1,
+                    "insumos": f"{float(row.get('material', 0.0)):.0f}g PLA",
+                    "custo_estimado": float(row.get("producao", 0.0)),
+                    "foto": str(row.get("imagem", ""))  # Pega o caminho exato da imagem do arquivo antigo!
                 })
             return produtos_convertidos
-        except Exception:
+        except Exception as e:
+            st.error(f"Erro ao importar dados antigos: {e}")
             return []
     return []
 
@@ -486,9 +500,11 @@ elif st.session_state["pagina_atual"] == "ProdutosCatalogo":
                                 st.write(f"• **Custo Estimado:** € {float(prod.get('custo_estimado', 0.0)):.2f}")
                             
                             with col_img:
-                                foto_path = str(prod.get("foto", ""))
-                                codigo_prod = str(prod.get("codigo", ""))
-                                foto_encontrada = ""
+                                foto_path = prod.get("foto", "")
+                                if foto_path and os.path.exists(foto_path):
+                                    st.image(foto_path, use_container_width=True)
+                                else:
+                                    st.caption("Sem foto")
                                 
                                 # Lista de possíveis caminhos onde a foto pode estar
                                 tentativas = []

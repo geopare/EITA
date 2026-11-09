@@ -161,7 +161,7 @@ elif st.session_state["pagina"] == "Catálogo":
                         st.markdown("---")
 
 # ==========================================
-# 3. CALCULADORA (CUSTOMIZÁVEL POR KG E HORA)
+# 3. CALCULADORA (CUSTOMIZÁVEL)
 # ==========================================
 elif st.session_state["pagina"] == "Calcular":
     st.markdown("## 💰 Calculadora de Precificação")
@@ -175,11 +175,11 @@ elif st.session_state["pagina"] == "Calcular":
     col_base1, col_base2 = st.columns(2)
     with col_base1:
         preco_kg_pla = st.number_input("Valor pago por 1 KG de PLA (€)", min_value=0.0, value=20.00, step=0.50, format="%.2f")
-        custo_g_pla = preco_kg_pla / 1000.0  # Converte KG para grama automaticamente
+        custo_g_pla = preco_kg_pla / 1000.0  
         st.caption(f"Custo resultante por grama: **€ {custo_g_pla:.4f} / g**")
     with col_base2:
         custo_h_imp = st.number_input("Custo por Hora de Impressão (€/h)", min_value=0.00, value=1.00, step=0.25, format="%.2f")
-        st.caption("Base sugerida na Alemanha: € 1.00 a € 1.50 / h")
+        st.caption("Base recomendada na Alemanha: € 1.00 a € 1.50 / h")
         
     st.markdown("---")
     st.markdown("### 🖨️ Dados do Projeto / Impressão")
@@ -189,25 +189,25 @@ elif st.session_state["pagina"] == "Calcular":
         gramas = st.number_input("Gramas de PLA usadas", min_value=0.0, value=50.0, step=1.0)
         horas = st.number_input("Horas de Impressão", min_value=0.0, value=3.0, step=0.5)
         
-        st.markdown("##### 🔌 Componentes Opcionais e Escrita")
+        st.markdown("##### 🔌 Componentes Opcionais e Descrições")
         
-        # Argolas com opção de texto/especificação
-        usa_argola = st.checkbox("Incluir Argola")
-        desc_argola = st.text_input("Especificação da Argola", placeholder="Ex: Argola 12mm níquel") if usa_argola else ""
-        qtd_argola = st.number_input("Qtd. Argolas", min_value=1, value=1) if usa_argola else 0
-        custo_unit_argola = st.number_input("Custo unitário da Argola (€)", min_value=0.0, value=0.10) if usa_argola else 0.0
+        # Tag NFC
+        usa_nfc = st.checkbox("Tag NFC")
+        desc_nfc = st.text_input("Descrição da Tag NFC", placeholder="Ex: NTAG216 adesiva") if usa_nfc else ""
+        qtd_nfc = st.number_input("Qtd. Tags NFC", min_value=1, value=1, key="q_nfc") if usa_nfc else 0
+        custo_unit_nfc = st.number_input("Custo unitário da NFC (€)", min_value=0.0, value=0.30, key="c_nfc") if usa_nfc else 0.0
         
     with col_calc2:
-        # NFC com opção de texto/especificação
-        usa_nfc = st.checkbox("Incluir Tag NFC")
-        desc_nfc = st.text_input("Especificação da NFC", placeholder="Ex: NTAG216 adesiva") if usa_nfc else ""
-        qtd_nfc = st.number_input("Qtd. Tags NFC", min_value=1, value=1) if usa_nfc else 0
-        custo_unit_nfc = st.number_input("Custo unitário da NFC (€)", min_value=0.0, value=0.30) if usa_nfc else 0.0
+        # Argola
+        usa_argola = st.checkbox("Argola")
+        desc_argola = st.text_input("Descrição da Argola", placeholder="Ex: Argola 12mm níquel") if usa_argola else ""
+        qtd_argola = st.number_input("Qtd. Argolas", min_value=1, value=1, key="q_arg") if usa_argola else 0
+        custo_unit_argola = st.number_input("Custo unitário da Argola (€)", min_value=0.0, value=0.10, key="c_arg") if usa_argola else 0.0
         
-        # Outros com opção de texto livre
-        usa_outros = st.checkbox("Incluir Outros Custos")
-        desc_outros = st.text_input("Descrição de Outros Custos", placeholder="Ex: Embalagem especial, fita") if usa_outros else ""
-        outros_custos = st.number_input("Valor de Outros Custos (€)", min_value=0.0, value=0.0, step=0.50) if usa_outros else 0.0
+        # Outros (com campo de descrição livre)
+        usa_outros = st.checkbox("Outros")
+        desc_outros = st.text_input("Descreva o que foi necessário", placeholder="Ex: Embalagem especial, fita, imã") if usa_outros else ""
+        outros_custos = st.number_input("Valor de Outros (€)", min_value=0.0, value=0.0, step=0.50, key="v_out") if usa_outros else 0.0
         
         margem = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, value=100.0, step=10.0)
 

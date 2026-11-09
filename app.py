@@ -10,11 +10,12 @@ st.set_page_config(page_title="Gestão EITA", page_icon="🖨️", layout="wide"
 PASTA_IMAGENS = "imagens"
 ARQUIVO_ANTIGO = "produtos_3d.csv"
 ARQUIVO_CATALOGO = "catalogo_produtos.csv"
+ARQUIVO_COMPRAS = "compras_insumos.csv"
 
 # Garante que a pasta de imagens existe
 os.makedirs(PASTA_IMAGENS, exist_ok=True)
 
-# Lista completa de categorias para abranger tudo do CSV antigo
+# Lista completa de categorias para abranger tudo
 categorias_produtos_lista = ["Decoração", "Natal", "Acessórios", "Utilitários", "Utilidades", "Brinquedos", "Outros"]
 
 # ==========================================
@@ -22,7 +23,7 @@ categorias_produtos_lista = ["Decoração", "Natal", "Acessórios", "Utilitário
 # ==========================================
 @st.cache_data
 def carregar_catalogo_direto():
-    caminho_usado = ARQUIVO_ANTIGO if os.path.exists(ARQUIVO_ANTIGO) else ARQUIVO_CATALOGO
+    caminho_usado = ARQUIVO_CATALOGO if os.path.exists(ARQUIVO_CATALOGO) else ARQUIVO_ANTIGO
     
     if os.path.exists(caminho_usado):
         try:
@@ -56,6 +57,16 @@ def carregar_catalogo_direto():
             return []
     return []
 
+@st.cache_data
+def carregar_compras():
+    if os.path.exists(ARQUIVO_COMPRAS):
+        try:
+            df = pd.read_csv(ARQUIVO_COMPRAS)
+            return df.to_dict("records")
+        except:
+            return []
+    return []
+
 def salvar_csv(caminho, dados, mensagem_sucesso):
     try:
         df = pd.DataFrame(dados)
@@ -68,13 +79,13 @@ def salvar_csv(caminho, dados, mensagem_sucesso):
 # INICIALIZAÇÃO DO SESSION STATE
 # ==========================================
 if "pagina_atual" not in st.session_state:
-    st.session_state["pagina_atual"] = "ProdutosCatalogo"
+    st.session_state["pagina_atual"] = "Catálogo de Produtos"
 
 if "catalogo" not in st.session_state:
     st.session_state["catalogo"] = carregar_catalogo_direto()
 
 if "compras" not in st.session_state:
-    st.session_state["compras"] = []
+    st.session_state["compras"] = carregar_compras()
 
 if "mostrar_produtos_catalogo" not in st.session_state:
     st.session_state["mostrar_produtos_catalogo"] = True
@@ -86,18 +97,26 @@ def renderizar_cabecalho(titulo):
     st.markdown(f"## 🖨️ Sistema EITA - {titulo}")
 
 # ==========================================
-# BARRA LATERAL / NAVEGAÇÃO
+# BARRA LATERAL / NAVEGAÇÃO COMPLETA
 # ==========================================
-st.sidebar.title("Navegação")
-opcao_menu = st.sidebar.radio("Ir para:", ["Catálogo de Produtos"], index=0)
+st.sidebar.title("🖨️ Menu EITA")
+opcao_menu = st.sidebar.radio(
+    "Ir para:", 
+    [
+        "Catálogo de Produtos", 
+        "Calculadora / Precificação", 
+        "Cadastrar Material Comprado", 
+        "Cadastrar Produção"
+    ],
+    index=0
+)
 
+st.session_state["pagina_atual"] = opcao_menu
+
+# ==========================================
+# PÁGINA 1: CATÁLOGO DE PRODUTOS
+# ==========================================
 if opcao_menu == "Catálogo de Produtos":
-    st.session_state["pagina_atual"] = "ProdutosCatalogo"
-
-# ==========================================
-# ABA 3: CATÁLOGO DE PRODUTOS
-# ==========================================
-if st.session_state["pagina_atual"] == "ProdutosCatalogo":
     edit_idx_cat = st.session_state["edit_idx_catalogo"]
     is_edit_cat = edit_idx_cat is not None
     renderizar_cabecalho("EDITAR PRODUTO" if is_edit_cat else "CADASTRO DE PRODUTOS (CATÁLOGO)")
@@ -105,6 +124,7 @@ if st.session_state["pagina_atual"] == "ProdutosCatalogo":
 
     item_cat_atual = st.session_state["catalogo"][edit_idx_cat] if is_edit_cat and edit_idx_cat < len(st.session_state["catalogo"]) else {}
 
+    # Mapear custo médio com base nas Compras cadastradas
     custo_g_pla = 0.025  
     custo_unit_nfc = 0.30  
     custo_unit_argola = 0.10  
@@ -116,6 +136,14 @@ if st.session_state["pagina_atual"] == "ProdutosCatalogo":
             total_g = pla_comp.apply(lambda r: r["quantidade"] * 1000 if str(r["unidade"]).upper() == "KG" else r["quantidade"], axis=1).sum()
             if total_g > 0:
                 custo_g_pla = pla_comp["custo_total"].sum() / total_g
+
+        nfc_comp = df_comp[df_comp["tipo_material"].str.upper() == "NFC"]
+        if not nfc_comp.empty and nfc_comp["quantidade"].sum() > 0:
+            custo_unit_nfc = nfc_comp["custo_total"].sum() / nfc_comp["quantidade"].sum()
+
+        arg_comp = df_comp[df_comp["tipo_material"].str.upper() == "ARGOLA"]
+        if not arg_comp.empty and arg_comp["quantidade"].sum() > 0:
+            custo_unit_argola = arg_comp["custo_total"].sum() / arg_comp["quantidade"].sum()
 
     with st.form("form_catalogo"):
         col1, col2 = st.columns(2)
@@ -284,3 +312,72 @@ if st.session_state["pagina_atual"] == "ProdutosCatalogo":
                                     salvar_csv(ARQUIVO_CATALOGO, st.session_state["catalogo"], "Produto excluído do catálogo")
                                     st.rerun()
                             st.markdown("---")
+
+# ==========================================
+# PÁGINA 2: CALCULADORA / PRECIFICAÇÃO
+# ==========================================
+elif opcao_menu == "Calculadora / Precificação":
+    renderizar_cabecalho("CALCULADORA DE PRECIFICAÇÃO")
+    st.markdown("---")
+    st.info("Simule custos avulsos de impressão e margem de lucro para novos projetos.")
+    
+    col_calc1, col_calc2 = st.columns(2)
+    with col_calc1:
+        Calc_horas = st.number_input("Horas de Impressão", min_value=0.0, value=2.0, step=0.5)
+        Calc_gramas = st.number_input("Gramas de Filamento (PLA)", min_value=0.0, value=30.0, step=5.0)
+    with col_calc2:
+        Calc_margem = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, value=100.0, step=10.0)
+        custo_calc_total = (Calc_gramas * 0.025) + (Calc_horas * 0.50) # Exemplo base de cálculo
+        preco_venda = custo_calc_total * (1 + (Calc_margem / 100))
+        
+        st.markdown(f"### 💶 Custo Total: € {custo_calc_total:.2f}")
+        st.markdown(f"### 🏷️ Preço de Venda Sugerido: € {preco_venda:.2f}")
+
+# ==========================================
+# PÁGINA 3: CADASTRAR MATERIAL COMPRADO
+# ==========================================
+elif opcao_menu == "Cadastrar Material Comprado":
+    renderizar_cabecalho("CADASTRO DE COMPRAS DE INSUMOS")
+    st.markdown("---")
+    
+    with st.form("form_compras"):
+        tipo_material = st.selectbox("Tipo de Material", ["PLA", "NFC", "Argola", "Outros"])
+        quantidade = st.number_input("Quantidade (ex: 1 para 1kg ou 100 para unidades)", min_value=0.1, value=1.0)
+        unidade = st.selectbox("Unidade", ["KG", "Gramas", "Unidades"])
+        custo_total = st.number_input("Custo Total Pago (€)", min_value=0.0, value=20.0)
+        
+        if st.form_submit_button("Registrar Compra"):
+            nova_compra = {
+                "tipo_material": tipo_material,
+                "quantidade": quantidade,
+                "unidade": unidade,
+                "custo_total": custo_total
+            }
+            st.session_state["compras"].append(nova_compra)
+            salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], "Compra registrada com sucesso!")
+            st.success("Compra registrada com sucesso!")
+            time.sleep(0.5)
+            st.rerun()
+            
+    if st.session_state["compras"]:
+        st.markdown("### 📦 Histórico de Compras")
+        df_c = pd.DataFrame(st.session_state["compras"])
+        st.dataframe(df_c, use_container_width=True)
+
+# ==========================================
+# PÁGINA 4: CADASTRAR PRODUÇÃO
+# ==========================================
+elif opcao_menu == "Cadastrar Produção":
+    renderizar_cabecalho("REGISTRO DE PRODUÇÃO")
+    st.markdown("---")
+    st.info("Registre lotes impressos e vincule aos produtos do catálogo.")
+    
+    if not st.session_state["catalogo"]:
+        st.warning("Cadastre produtos no catálogo primeiro para registrar produções.")
+    else:
+        nomes_prods = [p["nome"] for p in st.session_state["catalogo"]]
+        prod_escolhido = st.selectbox("Selecione o Produto Produzido", nomes_prods)
+        qtd_produzida = st.number_input("Quantidade Produzida", min_value=1, value=1, step=1)
+        
+        if st.button("Confirmar Produção"):
+            st.success(f"Registrada a produção de {qtd_produzida} unidade(s) de '{prod_escolhido}'!")

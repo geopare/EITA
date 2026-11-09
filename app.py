@@ -21,6 +21,9 @@ categorias_produtos_lista = ["Decoração", "Natal", "Acessórios", "Utilitário
 if "pagina" not in st.session_state:
     st.session_state["pagina"] = "Início"
 
+if "mostrar_tabela_compras" not in st.session_state:
+    st.session_state["mostrar_tabela_compras"] = True
+
 if "catalogo" not in st.session_state:
     if os.path.exists(ARQUIVO_CATALOGO):
         try:
@@ -180,7 +183,7 @@ elif st.session_state["pagina"] == "Calcular":
         st.markdown(f"### Venda Sugerida: € {venda:.2f}")
 
 # ==========================================
-# 4. COMPRAS (ATUALIZADO)
+# 4. COMPRAS (COM BOTÃO DE VER SALVAS)
 # ==========================================
 elif st.session_state["pagina"] == "Compras":
     st.markdown("## 🛒 Cadastro de Compras de Insumos")
@@ -221,13 +224,28 @@ elif st.session_state["pagina"] == "Compras":
             st.session_state["compras"].append(nova_compra)
             salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])
             st.success("Compra cadastrada com sucesso!")
-            time_sleep = 0.5
             st.rerun()
 
-    if st.session_state["compras"]:
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Botão para alternar a visualização das compras salvas
+    if st.button("📋 Ver / Ocultar Compras Salvas"):
+        st.session_state["mostrar_tabela_compras"] = not st.session_state["mostrar_tabela_compras"]
+
+    if st.session_state["mostrar_tabela_compras"]:
         st.markdown("### 📦 Histórico de Compras Registradas")
-        df_compras = pd.DataFrame(st.session_state["compras"])
-        st.dataframe(df_compras, use_container_width=True)
+        if not st.session_state["compras"]:
+            st.info("Nenhuma compra registrada até o momento.")
+        else:
+            df_compras = pd.DataFrame(st.session_state["compras"])
+            st.dataframe(df_compras, use_container_width=True)
+            
+            # Opção de limpeza ou exclusão individual rápida
+            if st.button("🗑️ Apagar Última Compra Adicionada"):
+                st.session_state["compras"].pop()
+                salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])
+                st.success("Última compra removida!")
+                st.rerun()
 
 # ==========================================
 # 5. PRODUÇÃO

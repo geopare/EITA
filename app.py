@@ -15,7 +15,7 @@ ARQUIVO_PRODUCAO = "producao_lotes.csv"
 
 os.makedirs(PASTA_IMAGENS, exist_ok=True)
 
-# Categorias completas e separadas conforme solicitado
+# Categorias oficiais e separadas
 categorias_produtos_lista = ["Decoração", "Utilidades", "Acessórios", "Natal", "Laços", "Outros"]
 
 # ==========================================
@@ -33,7 +33,23 @@ if "mostrar_tabela_producao" not in st.session_state:
 if "edit_idx_catalogo" not in st.session_state:
     st.session_state["edit_idx_catalogo"] = None
 
-# Carregamento inteligente e unificado do Catálogo
+def normalizar_categoria(cat_str):
+    """Padroniza e mapeia corretamente as categorias existentes"""
+    c = str(cat_str).strip().lower()
+    if "decor" in c:
+        return "Decoração"
+    elif "util" in c:
+        return "Utilidades"
+    elif "acess" in c:
+        return "Acessórios"
+    elif "natal" in c:
+        return "Natal"
+    elif "laç" in c or "lac" in c:
+        return "Laços"
+    else:
+        return "Outros"
+
+# Carregamento inteligente com mapeamento corrigido
 if "catalogo" not in st.session_state:
     lista_carregada = []
     
@@ -41,9 +57,7 @@ if "catalogo" not in st.session_state:
         try:
             df_cat = pd.read_csv(ARQUIVO_CATALOGO)
             for _, r in df_cat.iterrows():
-                cat_nome = str(r.get("categoria", "Outros")).strip()
-                if cat_nome not in categorias_produtos_lista:
-                    cat_nome = "Outros"
+                cat_nome = normalizar_categoria(r.get("categoria", "Outros"))
                 lista_carregada.append({
                     "codigo": str(r.get("codigo", "SKU-001")),
                     "nome": str(r.get("nome", "Produto")),
@@ -61,9 +75,7 @@ if "catalogo" not in st.session_state:
         try:
             df_old = pd.read_csv(ARQUIVO_ANTIGO)
             for _, r in df_old.iterrows():
-                cat_nome = str(r.get("categoria", "Outros")).strip()
-                if cat_nome not in categorias_produtos_lista:
-                    cat_nome = "Outros"
+                cat_nome = normalizar_categoria(r.get("categoria", "Outros"))
                 lista_carregada.append({
                     "codigo": str(r.get("codigo", "SKU-001")),
                     "nome": str(r.get("nome", "Produto")),
@@ -453,4 +465,52 @@ elif st.session_state["pagina"] == "Produção":
         
         prod_atual = next((p for p in st.session_state["catalogo"] if p["nome"] == produto_escolhido), {})
         
-        col_p1, col
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            codigo_prod = prod_atual.get("codigo", "SKU-000")
+            st.text_input("Código", value=codigo_prod, disabled=True)
+            categoria_prod = prod_atual.get("categoria", "Outros")
+            st.text_input("Categoria", value=categoria_prod, disabled=True)
+            quantidade_lote = st.number_input("Quantidade no Lote", min_value=1, value=1, step=1)
+            data_producao = st.date_input("Data da Produção", value=date.today())
+            
+        with col_p2:
+            preco_unit = float(prod_atual.get("preco_calculado", 0.0))
+            st.metric(label="Preço Unitário Calculado", value=f"€ {preco_unit:.2f}")
+            st.metric(label="Valor Total do Lote", value=f"€ {preco_unit * quantidade_lote:.2f}")
+            
+            foto_p = str(prod_atual.get("foto", ""))
+            if foto_p and os.path.exists(foto_p):
+                st.image(foto_p, width=150, caption=produto_escolhido)
+            else:
+                st.caption("Sem foto.")
+                
+        if st.button("💾 Salvar Lote Produzido"):
+            nova_prod = {
+                "codigo": codigo_prod,
+                "nome_produto": produto_escolhido,
+                "categoria": categoria_prod,
+                "quantidade": quantidade_lote,
+                "data_producao": str(data_producao),
+                "valor_total_lote": round(preco_unit * quantidade_lote, 2)
+            }
+            st.session_state["producao"].append(nova_prod)
+            salvar_dados(ARQUIVO_PRODUCAO, st.session_state["producao"])
+            st.success("Produção registrada com sucesso!")
+            st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("📋 Ver / Ocultar Histórico de Produção"):
+        st.session_state["mostrar_tabela_producao"] = not st.session_state["mostrar_tabela_producao"]
+
+    if st.session_state["mostrar_tabela_producao"]:
+        st.markdown("### 📦 Lotes Produzidos")
+        if not st.session_state["producao"]:
+            st.info("Nenhum lote registrado.")
+        else:
+            st.dataframe(pd.DataFrame(st.session_state["producao"]), use_container_width=True)
+            if st.button("🗑️ Apagar Último Registro"):
+                st.session_state["producao"].pop()
+                salvar_dados(ARQUIVO_PRODUCAO, st.session_state["producao"])
+                st.success("Removido!")
+                st.rerun()

@@ -174,9 +174,9 @@ elif st.session_state["pagina"] == "Calcular":
     st.markdown("### ⚙️ Custos Base por Unidade")
     col_base1, col_base2 = st.columns(2)
     with col_base1:
-        custo_g_pla = st.number_input("Custo por Grama de PLA (€/g)", min_value=0.000, value=0.025, format="("%.3f")")
+        custo_g_pla = st.number_input("Custo por Grama de PLA (€/g)", min_value=0.000, value=0.025, format="%.3f")
     with col_base2:
-        custo_h_imp = st.number_input("Custo por Hora de Impressão (€/h)", min_value=0.00, value=0.50, format="("%.2f")")
+        custo_h_imp = st.number_input("Custo por Hora de Impressão (€/h)", min_value=0.00, value=0.50, format="%.2f")
         
     st.markdown("---")
     st.markdown("### 🖨️ Dados do Projeto / Impressão")

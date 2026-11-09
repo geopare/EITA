@@ -161,7 +161,7 @@ elif st.session_state["pagina"] == "Catálogo":
                         st.markdown("---")
 
 # ==========================================
-# 3. CALCULADORA
+# 3. CALCULADORA (CUSTOMIZÁVEL)
 # ==========================================
 elif st.session_state["pagina"] == "Calcular":
     st.markdown("## 💰 Calculadora de Precificação")
@@ -171,19 +171,53 @@ elif st.session_state["pagina"] == "Calcular":
         st.session_state["pagina"] = "Início"
         st.rerun()
         
-    c1, c2 = st.columns(2)
-    with c1:
-        gramas = st.number_input("Gramas de PLA", min_value=0.0, value=50.0)
-        horas = st.number_input("Horas de Impressão", min_value=0.0, value=3.0)
-    with c2:
-        margem = st.number_input("Margem de Lucro (%)", min_value=0.0, value=100.0)
-        custo = (gramas * 0.025) + (horas * 0.50)
-        venda = custo * (1 + (margem / 100))
-        st.markdown(f"### Custo: € {custo:.2f}")
-        st.markdown(f"### Venda Sugerida: € {venda:.2f}")
+    st.markdown("### ⚙️ Custos Base por Unidade")
+    col_base1, col_base2 = st.columns(2)
+    with col_base1:
+        custo_g_pla = st.number_input("Custo por Grama de PLA (€/g)", min_value=0.000, value=0.025, format="("%.3f")")
+    with col_base2:
+        custo_h_imp = st.number_input("Custo por Hora de Impressão (€/h)", min_value=0.00, value=0.50, format="("%.2f")")
+        
+    st.markdown("---")
+    st.markdown("### 🖨️ Dados do Projeto / Impressão")
+    
+    col_calc1, col_calc2 = st.columns(2)
+    with col_calc1:
+        gramas = st.number_input("Gramas de PLA usadas", min_value=0.0, value=50.0, step=1.0)
+        horas = st.number_input("Horas de Impressão", min_value=0.0, value=3.0, step=0.5)
+        
+        st.markdown("##### 🔌 Componentes Opcionais")
+        usa_nfc = st.checkbox("Incluir Tag NFC")
+        qtd_nfc = st.number_input("Qtd. Tags NFC", min_value=1, value=1) if usa_nfc else 0
+        custo_unit_nfc = st.number_input("Custo unitário da NFC (€)", min_value=0.0, value=0.30) if usa_nfc else 0.0
+        
+    with col_calc2:
+        usa_argola = st.checkbox("Incluir Argola")
+        qtd_argola = st.number_input("Qtd. Argolas", min_value=1, value=1) if usa_argola else 0
+        custo_unit_argola = st.number_input("Custo unitário da Argola (€)", min_value=0.0, value=0.10) if usa_argola else 0.0
+        
+        outros_custos = st.number_input("Outros Custos Extras (€)", min_value=0.0, value=0.0, step=0.50)
+        margem = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, value=100.0, step=10.0)
+
+    # Cálculos
+    custo_pla = gramas * custo_g_pla
+    custo_horas = horas * custo_h_imp
+    custo_nfc_total = qtd_nfc * custo_unit_nfc
+    custo_argola_total = qtd_argola * custo_unit_argola
+    
+    custo_total = custo_pla + custo_horas + custo_nfc_total + custo_argola_total + outros_custos
+    preco_venda = custo_total * (1 + (margem / 100))
+    
+    st.markdown("---")
+    st.markdown("### 📊 Resultado da Precificação")
+    res1, res2 = st.columns(2)
+    with res1:
+        st.metric(label="Custo Total de Produção", value=f"€ {custo_total:.2f}")
+    with res2:
+        st.metric(label="Preço de Venda Sugerido", value=f"€ {preco_venda:.2f}")
 
 # ==========================================
-# 4. COMPRAS (COM BOTÃO DE VER SALVAS)
+# 4. COMPRAS
 # ==========================================
 elif st.session_state["pagina"] == "Compras":
     st.markdown("## 🛒 Cadastro de Compras de Insumos")
@@ -228,7 +262,6 @@ elif st.session_state["pagina"] == "Compras":
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Botão para alternar a visualização das compras salvas
     if st.button("📋 Ver / Ocultar Compras Salvas"):
         st.session_state["mostrar_tabela_compras"] = not st.session_state["mostrar_tabela_compras"]
 
@@ -240,7 +273,6 @@ elif st.session_state["pagina"] == "Compras":
             df_compras = pd.DataFrame(st.session_state["compras"])
             st.dataframe(df_compras, use_container_width=True)
             
-            # Opção de limpeza ou exclusão individual rápida
             if st.button("🗑️ Apagar Última Compra Adicionada"):
                 st.session_state["compras"].pop()
                 salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])

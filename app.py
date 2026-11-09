@@ -9,6 +9,7 @@ st.set_page_config(page_title="Gestão EITA", page_icon="🖨️", layout="wide"
 # Caminhos dos arquivos e pastas
 PASTA_IMAGENS = "imagens"
 ARQUIVO_CATALOGO = "catalogo_produtos.csv"
+ARQUIVO_ANTIGO = "produtos_3d.csv"
 ARQUIVO_COMPRAS = "compras_insumos.csv"
 ARQUIVO_PRODUCAO = "producao_lotes.csv"
 
@@ -18,7 +19,7 @@ os.makedirs(PASTA_IMAGENS, exist_ok=True)
 categorias_produtos_lista = ["Acessórios", "Utilidades", "Natal", "Laços", "Outros"]
 
 # ==========================================
-# GERENCIAMENTO DE ESTADO E CARREGAMENTO
+# GERENCIAMENTO DE ESTADO E CARREGAMENTO UNIFICADO
 # ==========================================
 if "pagina" not in st.session_state:
     st.session_state["pagina"] = "Início"
@@ -29,16 +30,53 @@ if "mostrar_tabela_compras" not in st.session_state:
 if "mostrar_tabela_producao" not in st.session_state:
     st.session_state["mostrar_tabela_producao"] = True
 
-# Carrega Catálogo com tratamento robusto
+# Carregamento inteligente e unificado do Catálogo (lê o novo ou converte o antigo)
 if "catalogo" not in st.session_state:
+    lista_carregada = []
+    
+    # Tenta carregar do catálogo principal
     if os.path.exists(ARQUIVO_CATALOGO):
         try:
             df_cat = pd.read_csv(ARQUIVO_CATALOGO)
-            st.session_state["catalogo"] = df_cat.to_dict("records")
+            for _, r in df_cat.iterrows():
+                cat_nome = str(r.get("categoria", "Outros")).strip()
+                if cat_nome not in categorias_produtos_lista:
+                    cat_nome = "Outros"
+                lista_carregada.append({
+                    "codigo": str(r.get("codigo", "SKU-001")),
+                    "nome": str(r.get("nome", "Produto")),
+                    "categoria": cat_nome,
+                    "gramas_pla": float(r.get("gramas_pla", r.get("material", 0.0))),
+                    "horas_imp": float(r.get("horas_imp", r.get("tempo", 0.0))),
+                    "extras": str(r.get("extras", "Nenhum")),
+                    "preco_calculado": float(r.get("preco_calculado", r.get("producao", 0.0))),
+                    "foto": str(r.get("foto", r.get("imagem", "")))
+                })
         except:
-            st.session_state["catalogo"] = []
-    else:
-        st.session_state["catalogo"] = []
+            pass
+
+    # Se estiver vazio, tenta importar do arquivo antigo se existir
+    if not lista_carregada and os.path.exists(ARQUIVO_ANTIGO):
+        try:
+            df_old = pd.read_csv(ARQUIVO_ANTIGO)
+            for _, r in df_old.iterrows():
+                cat_nome = str(r.get("categoria", "Outros")).strip()
+                if cat_nome not in categorias_produtos_lista:
+                    cat_nome = "Outros"
+                lista_carregada.append({
+                    "codigo": str(r.get("codigo", "SKU-001")),
+                    "nome": str(r.get("nome", "Produto")),
+                    "categoria": cat_nome,
+                    "gramas_pla": float(r.get("material", 0.0)),
+                    "horas_imp": float(r.get("tempo", 0.0)),
+                    "extras": "Importado do sistema anterior",
+                    "preco_calculado": float(r.get("producao", 0.0)),
+                    "foto": str(r.get("imagem", ""))
+                })
+        except:
+            pass
+
+    st.session_state["catalogo"] = lista_carregada
 
 # Carrega Compras
 if "compras" not in st.session_state:
@@ -150,7 +188,7 @@ elif st.session_state["pagina"] == "Catálogo":
             
             # Geração automática de código baseada na categoria
             prefixo = categoria_prod[:3].upper()
-            prods_mesma_cat = [p for p in st.session_state["catalogo"] if str(p.get("categoria")) == categoria_prod]
+            prods_mesma_cat = [p for p in st.session_state["catalogo"] if str(p.get("categoria")).strip() == categoria_prod]
             proximo_num = len(prods_mesma_cat) + 1
             codigo_automatico = f"{prefixo}-{proximo_num:03d}"
             

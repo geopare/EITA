@@ -189,7 +189,6 @@ elif st.session_state["pagina"] == "Catálogo":
                     with open(caminho_foto, "wb") as f:
                         f.write(foto_upload.getbuffer())
 
-                # Cálculo automático do preço final baseado em padrões (Ex: €0.02/g PLA, €1.00/h impressão)
                 custo_pla = gramas_pla * 0.02
                 custo_horas = horas_imp * 1.00
                 custo_total = custo_pla + custo_horas + custo_nfc + custo_argola + custo_outros
@@ -218,8 +217,6 @@ elif st.session_state["pagina"] == "Catálogo":
         st.info("Nenhum produto cadastrado no catálogo ainda.")
     else:
         for cat in categorias_produtos_lista:
-            prods_cat = [p for p in st.session_state["catalogo"]]
-            # Filtragem segura por categoria
             prods_filtrados = [p for p in st.session_state["catalogo"] if str(p.get("categoria")).strip() == cat]
             
             if prods_filtrados:

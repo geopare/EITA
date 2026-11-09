@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+from datetime import date
 
 # Configuração da Página
 st.set_page_config(page_title="Gestão EITA", page_icon="🖨️", layout="wide")
@@ -15,7 +16,7 @@ os.makedirs(PASTA_IMAGENS, exist_ok=True)
 categorias_produtos_lista = ["Decoração", "Natal", "Acessórios", "Utilitários", "Utilidades", "Brinquedos", "Outros"]
 
 # ==========================================
-# GERENCIAMENTO DE ESTADO
+# GERENCIAMENTO DE ESTADO E CARREGAMENTO
 # ==========================================
 if "pagina" not in st.session_state:
     st.session_state["pagina"] = "Início"
@@ -75,7 +76,6 @@ st.session_state["pagina"] = escolha_lateral
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📥 Downloads de Arquivos")
 
-# Função auxiliar para download
 def botao_download(nome_arquivo, label):
     if os.path.exists(nome_arquivo):
         with open(nome_arquivo, "rb") as f:
@@ -98,10 +98,8 @@ botao_download(ARQUIVO_COMPRAS, "📥 Baixar Compras (CSV)")
 if st.session_state["pagina"] == "Início":
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    # Centralizando a Logo e os botões
     col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
     with col_l2:
-        # Exibe a logo se existir na pasta ou exibe um título elegante caso não tenha o arquivo logo.png
         if os.path.exists("logo.png"):
             st.image("logo.png", use_container_width=True)
         else:
@@ -145,7 +143,7 @@ elif st.session_state["pagina"] == "Catálogo":
             prods = [p for p in st.session_state["catalogo"] if p.get("categoria") == cat]
             if prods:
                 with st.expander(f"📁 **{cat}** ({len(prods)} produtos)"):
-                    for idx, prod in enumerate(prods):
+                    for idx, prod in prods:
                         st.markdown(f"**🏷️ [{prod.get('codigo')}] {prod.get('nome')}**")
                         c1, c2 = st.columns([3, 1])
                         with c1:
@@ -182,25 +180,54 @@ elif st.session_state["pagina"] == "Calcular":
         st.markdown(f"### Venda Sugerida: € {venda:.2f}")
 
 # ==========================================
-# 4. COMPRAS
+# 4. COMPRAS (ATUALIZADO)
 # ==========================================
 elif st.session_state["pagina"] == "Compras":
-    st.markdown("## 🛒 Cadastro de Compras")
+    st.markdown("## 🛒 Cadastro de Compras de Insumos")
     st.markdown("---")
     
     if st.button("⬅️ Voltar para a Página Inicial"):
         st.session_state["pagina"] = "Início"
         st.rerun()
         
-    with st.form("form_compra"):
-        material = st.selectbox("Material", ["PLA", "NFC", "Argola", "Outros"])
-        qtd = st.number_input("Quantidade", min_value=0.1, value=1.0)
-        total = st.number_input("Custo Total (€)", min_value=0.0, value=20.0)
+    with st.form("form_compra_detalhada"):
+        col_c1, col_c2 = st.columns(2)
+        
+        with col_c1:
+            material = st.selectbox("Material", ["PLA", "Argolas", "NFC", "OUTROS"])
+            data_compra = st.date_input("Data da Compra", value=date.today())
+            variedade = st.text_input("Variedade (Cor / Modelo / Marca)", placeholder="Ex: Azul Seda, 12mm, NTAG216")
+            
+        with col_c2:
+            col_q1, col_q2 = st.columns(2)
+            with col_q1:
+                qtd = st.number_input("Quantidade", min_value=0.01, value=1.0, step=1.0)
+            with col_q2:
+                unidade_medida = st.selectbox("Unidade", ["KG", "Unidades", "Gramas", "Metros"])
+                
+            valor_compra = st.number_input("Valor da Compra (€)", min_value=0.0, value=20.0, step=1.0)
+            identificacao_nota = st.text_input("Identificação da Nota (NF / Fatura)", placeholder="Ex: NF-12345 ou Fatura 2026/04")
+            
         if st.form_submit_button("Salvar Compra"):
-            st.session_state["compras"].append({"material": material, "quantidade": qtd, "custo_total": total})
+            nova_compra = {
+                "material": material,
+                "data_compra": str(data_compra),
+                "variedade": variedade,
+                "quantidade": qtd,
+                "unidade": unidade_medida,
+                "valor_compra": valor_compra,
+                "identificacao_nota": identificacao_nota
+            }
+            st.session_state["compras"].append(nova_compra)
             salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])
-            st.success("Compra salva!")
+            st.success("Compra cadastrada com sucesso!")
+            time_sleep = 0.5
             st.rerun()
+
+    if st.session_state["compras"]:
+        st.markdown("### 📦 Histórico de Compras Registradas")
+        df_compras = pd.DataFrame(st.session_state["compras"])
+        st.dataframe(df_compras, use_container_width=True)
 
 # ==========================================
 # 5. PRODUÇÃO

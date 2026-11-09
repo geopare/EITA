@@ -1,383 +1,216 @@
 import streamlit as st
 import pandas as pd
 import os
-import time
 
 # Configuração da Página
 st.set_page_config(page_title="Gestão EITA", page_icon="🖨️", layout="wide")
 
 # Caminhos dos arquivos e pastas
 PASTA_IMAGENS = "imagens"
-ARQUIVO_ANTIGO = "produtos_3d.csv"
 ARQUIVO_CATALOGO = "catalogo_produtos.csv"
+ARQUIVO_ANTIGO = "produtos_3d.csv"
 ARQUIVO_COMPRAS = "compras_insumos.csv"
 
-# Garante que a pasta de imagens existe
 os.makedirs(PASTA_IMAGENS, exist_ok=True)
-
-# Lista completa de categorias para abranger tudo
 categorias_produtos_lista = ["Decoração", "Natal", "Acessórios", "Utilitários", "Utilidades", "Brinquedos", "Outros"]
 
 # ==========================================
-# FUNÇÕES DE CARREGAMENTO E SUPORTE
+# GERENCIAMENTO DE ESTADO
 # ==========================================
-@st.cache_data
-def carregar_catalogo_direto():
-    caminho_usado = ARQUIVO_CATALOGO if os.path.exists(ARQUIVO_CATALOGO) else ARQUIVO_ANTIGO
-    
-    if os.path.exists(caminho_usado):
-        try:
-            df = pd.read_csv(caminho_usado)
-            produtos_convertidos = []
-            for _, row in df.iterrows():
-                if "horas_imp" in df.columns:
-                    produtos_convertidos.append(row.to_dict())
-                else:
-                    tempo_total = float(row.get("tempo", 0.0))
-                    horas = int(tempo_total)
-                    minutos = int(round((tempo_total - horas) * 60))
-                    
-                    produtos_convertidos.append({
-                        "codigo": str(row.get("codigo", "SKU-001")),
-                        "nome": str(row.get("nome", "Produto")),
-                        "categoria": str(row.get("categoria", "Outros")),
-                        "horas_imp": horas,
-                        "minutos_imp": minutos,
-                        "gramas_pla": float(row.get("material", 0.0)),
-                        "usar_argola": False,
-                        "qtd_argola": 1,
-                        "usar_nfc": False,
-                        "qtd_nfc": 1,
-                        "insumos": f"{float(row.get('material', 0.0)):.0f}g PLA",
-                        "custo_estimado": float(row.get("producao", 0.0)),
-                        "foto": str(row.get("imagem", ""))
-                    })
-            return produtos_convertidos
-        except Exception as e:
-            return []
-    return []
-
-@st.cache_data
-def carregar_compras():
-    if os.path.exists(ARQUIVO_COMPRAS):
-        try:
-            df = pd.read_csv(ARQUIVO_COMPRAS)
-            return df.to_dict("records")
-        except:
-            return []
-    return []
-
-def salvar_csv(caminho, dados, mensagem_sucesso):
-    try:
-        df = pd.DataFrame(dados)
-        df.to_csv(caminho, index=False)
-        st.cache_data.clear()
-    except Exception as e:
-        st.error(f"Erro ao salvar arquivo {caminho}: {e}")
-
-# ==========================================
-# INICIALIZAÇÃO DO SESSION STATE
-# ==========================================
-if "pagina_atual" not in st.session_state:
-    st.session_state["pagina_atual"] = "Catálogo de Produtos"
+if "pagina" not in st.session_state:
+    st.session_state["pagina"] = "Início"
 
 if "catalogo" not in st.session_state:
-    st.session_state["catalogo"] = carregar_catalogo_direto()
+    if os.path.exists(ARQUIVO_CATALOGO):
+        try:
+            st.session_state["catalogo"] = pd.read_csv(ARQUIVO_CATALOGO).to_dict("records")
+        except:
+            st.session_state["catalogo"] = []
+    elif os.path.exists(ARQUIVO_ANTIGO):
+        try:
+            df_old = pd.read_csv(ARQUIVO_ANTIGO)
+            conv = []
+            for _, r in df_old.iterrows():
+                t = float(r.get("tempo", 0.0))
+                conv.append({
+                    "codigo": str(r.get("codigo", "SKU-001")),
+                    "nome": str(r.get("nome", "Produto")),
+                    "categoria": str(r.get("categoria", "Outros")),
+                    "horas_imp": int(t),
+                    "minutos_imp": int(round((t - int(t)) * 60)),
+                    "gramas_pla": float(r.get("material", 0.0)),
+                    "custo_estimado": float(r.get("producao", 0.0)),
+                    "foto": str(r.get("imagem", ""))
+                })
+            st.session_state["catalogo"] = conv
+        except:
+            st.session_state["catalogo"] = []
+    else:
+        st.session_state["catalogo"] = []
 
 if "compras" not in st.session_state:
-    st.session_state["compras"] = carregar_compras()
+    if os.path.exists(ARQUIVO_COMPRAS):
+        try:
+            st.session_state["compras"] = pd.read_csv(ARQUIVO_COMPRAS).to_dict("records")
+        except:
+            st.session_state["compras"] = []
+    else:
+        st.session_state["compras"] = []
 
-if "mostrar_produtos_catalogo" not in st.session_state:
-    st.session_state["mostrar_produtos_catalogo"] = True
-
-if "edit_idx_catalogo" not in st.session_state:
-    st.session_state["edit_idx_catalogo"] = None
-
-def renderizar_cabecalho(titulo):
-    st.markdown(f"## 🖨️ Sistema EITA - {titulo}")
-
-# ==========================================
-# BARRA LATERAL / NAVEGAÇÃO COMPLETA
-# ==========================================
-st.sidebar.title("🖨️ Menu EITA")
-opcao_menu = st.sidebar.radio(
-    "Ir para:", 
-    [
-        "Catálogo de Produtos", 
-        "Calculadora / Precificação", 
-        "Cadastrar Material Comprado", 
-        "Cadastrar Produção"
-    ],
-    index=0
-)
-
-st.session_state["pagina_atual"] = opcao_menu
+def salvar_dados(caminho, dados):
+    try:
+        pd.DataFrame(dados).to_csv(caminho, index=False)
+    except Exception as e:
+        st.error(f"Erro ao salvar: {e}")
 
 # ==========================================
-# PÁGINA 1: CATÁLOGO DE PRODUTOS
+# MENU LATERAL & DOWNLOAD DE ARQUIVOS
 # ==========================================
-if opcao_menu == "Catálogo de Produtos":
-    edit_idx_cat = st.session_state["edit_idx_catalogo"]
-    is_edit_cat = edit_idx_cat is not None
-    renderizar_cabecalho("EDITAR PRODUTO" if is_edit_cat else "CADASTRO DE PRODUTOS (CATÁLOGO)")
-    st.markdown("---")
+st.sidebar.title("🖨️ Sistema EITA")
+menu_opcoes = ["Início", "Catálogo", "Calcular", "Compras", "Produção"]
+escolha_lateral = st.sidebar.radio("Navegação", menu_opcoes, index=menu_opcoes.index(st.session_state["pagina"]) if st.session_state["pagina"] in menu_opcoes else 0)
 
-    item_cat_atual = st.session_state["catalogo"][edit_idx_cat] if is_edit_cat and edit_idx_cat < len(st.session_state["catalogo"]) else {}
+st.session_state["pagina"] = escolha_lateral
 
-    # Mapear custo médio com base nas Compras cadastradas
-    custo_g_pla = 0.025  
-    custo_unit_nfc = 0.30  
-    custo_unit_argola = 0.10  
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📥 Downloads de Arquivos")
 
-    if st.session_state.get("compras"):
-        df_comp = pd.DataFrame(st.session_state["compras"])
-        pla_comp = df_comp[df_comp["tipo_material"].str.upper() == "PLA"]
-        if not pla_comp.empty and pla_comp["quantidade"].sum() > 0:
-            total_g = pla_comp.apply(lambda r: r["quantidade"] * 1000 if str(r["unidade"]).upper() == "KG" else r["quantidade"], axis=1).sum()
-            if total_g > 0:
-                custo_g_pla = pla_comp["custo_total"].sum() / total_g
+# Função auxiliar para download
+def botao_download(nome_arquivo, label):
+    if os.path.exists(nome_arquivo):
+        with open(nome_arquivo, "rb") as f:
+            st.sidebar.download_button(
+                label=label,
+                data=f,
+                file_name=nome_arquivo,
+                mime="text/csv"
+            )
+    else:
+        st.sidebar.caption(f"{nome_arquivo} não encontrado.")
 
-        nfc_comp = df_comp[df_comp["tipo_material"].str.upper() == "NFC"]
-        if not nfc_comp.empty and nfc_comp["quantidade"].sum() > 0:
-            custo_unit_nfc = nfc_comp["custo_total"].sum() / nfc_comp["quantidade"].sum()
+botao_download(ARQUIVO_CATALOGO, "📥 Baixar Catálogo (CSV)")
+botao_download(ARQUIVO_ANTIGO, "📥 Baixar Dados Antigos (CSV)")
+botao_download(ARQUIVO_COMPRAS, "📥 Baixar Compras (CSV)")
 
-        arg_comp = df_comp[df_comp["tipo_material"].str.upper() == "ARGOLA"]
-        if not arg_comp.empty and arg_comp["quantidade"].sum() > 0:
-            custo_unit_argola = arg_comp["custo_total"].sum() / arg_comp["quantidade"].sum()
-
-    with st.form("form_catalogo"):
-        col1, col2 = st.columns(2)
+# ==========================================
+# 1. PÁGINA INICIAL (HOME)
+# ==========================================
+if st.session_state["pagina"] == "Início":
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    # Centralizando a Logo e os botões
+    col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
+    with col_l2:
+        # Exibe a logo se existir na pasta ou exibe um título elegante caso não tenha o arquivo logo.png
+        if os.path.exists("logo.png"):
+            st.image("logo.png", use_container_width=True)
+        else:
+            st.markdown("<h1 style='text-align: center;'>🖨️ GESTÃO EITA</h1>", unsafe_allow_html=True)
+            st.caption("<p style='text-align: center;'>Central de Controle de Impressão 3D</p>", unsafe_allow_html=True)
         
-        with col1:
-            nome_prod = st.text_input("Nome do Produto", value=item_cat_atual.get("nome", "")).strip()
-            
-            cat_atual = item_cat_atual.get("categoria", categorias_produtos_lista[0])
-            cat_idx = categorias_produtos_lista.index(cat_atual) if cat_atual in categorias_produtos_lista else 0
-            categoria_prod = st.selectbox("Categoria", categorias_produtos_lista, index=cat_idx)
-
-            prefixo = categoria_prod[:3].upper()
-            prods_cat = [p for p in st.session_state["catalogo"] if p.get("categoria") == categoria_prod]
-            proximo_numero = len(prods_cat) + 1 if not is_edit_cat else int(str(item_cat_atual.get("codigo", f"{prefixo}-000")).split("-")[-1])
-            codigo_auto = item_cat_atual.get("codigo") if is_edit_cat else f"{prefixo}-{proximo_numero:03d}"
-
-            st.text_input("Código do Produto (Gerado Automático)", value=codigo_auto, disabled=True)
-
-            c_h, c_m = st.columns(2)
-            with c_h:
-                horas_imp = st.number_input("Horas de Impressão", min_value=0, max_value=72, value=int(item_cat_atual.get("horas_imp", 0)), step=1)
-            with c_m:
-                minutos_imp = st.number_input("Minutos de Impressão", min_value=0, max_value=59, value=int(item_cat_atual.get("minutos_imp", 0)), step=5)
-
-            gramas_pla = st.number_input("Peso de PLA (Gramas)", min_value=0.0, step=1.0, value=float(item_cat_atual.get("gramas_pla", 0.0)))
-
-        with col2:
-            st.markdown("##### 🔌 Acessórios e Extras Opcionais")
-            usar_argola = st.checkbox("Incluir Argola de Chaveiro", value=item_cat_atual.get("usar_argola", False))
-            qtd_argola = st.number_input("Qtd. Argolas", min_value=1, step=1, value=int(item_cat_atual.get("qtd_argola", 1))) if usar_argola else 0
-
-            usar_nfc = st.checkbox("Incluir Tag NFC", value=item_cat_atual.get("usar_nfc", False))
-            qtd_nfc = st.number_input("Qtd. Tags NFC", min_value=1, step=1, value=int(item_cat_atual.get("qtd_nfc", 1))) if usar_nfc else 0
-
-            st.markdown("##### 📸 Imagem do Produto")
-            tipo_foto_opcao = st.radio("Origem da Imagem", ["Fazer Upload de Nova", "Escolher Foto Já Salva"], horizontal=True)
-            
-            upload_foto = None
-            foto_selecionada_existente = ""
-            imagens_existentes = [f for f in os.listdir(PASTA_IMAGENS) if f.lower().endswith(('png', 'jpg', 'jpeg'))] if os.path.exists(PASTA_IMAGENS) else []
-
-            if tipo_foto_opcao == "Fazer Upload de Nova":
-                upload_foto = st.file_uploader("Selecione um arquivo de imagem", type=["jpg", "jpeg", "png"])
-            else:
-                if imagens_existentes:
-                    foto_escolhida = st.selectbox("Selecione uma foto já cadastrada", imagens_existentes)
-                    foto_selecionada_existente = os.path.join(PASTA_IMAGENS, foto_escolhida)
-                else:
-                    st.info("Nenhuma foto salva anteriormente na pasta.")
-
-            custo_pla_calc = gramas_pla * custo_g_pla
-            custo_arg_calc = qtd_argola * custo_unit_argola
-            custo_nfc_calc = qtd_nfc * custo_unit_nfc
-            custo_total_est = custo_pla_calc + custo_arg_calc + custo_nfc_calc
-
-            st.markdown(f"**Custo Estimado do Produto:** € {custo_total_est:.2f}")
-
-        btn_txt = "Salvar Alterações no Produto" if is_edit_cat else "Cadastrar Produto no Catálogo"
-        if st.form_submit_button(btn_txt):
-            if not nome_prod:
-                st.error("Preencha o Nome do Produto.")
-            else:
-                caminho_foto = item_cat_atual.get("foto", "")
-                if tipo_foto_opcao == "Fazer Upload de Nova" and upload_foto is not None:
-                    ext = upload_foto.name.split(".")[-1]
-                    os.makedirs(PASTA_IMAGENS, exist_ok=True)
-                    caminho_foto = os.path.join(PASTA_IMAGENS, f"{codigo_auto}.{ext}")
-                    with open(caminho_foto, "wb") as f:
-                        f.write(upload_foto.getbuffer())
-                elif tipo_foto_opcao == "Escolher Foto Já Salva" and foto_selecionada_existente:
-                    caminho_foto = foto_selecionada_existente
-
-                insumos_detalhe = [f"{gramas_pla:.0f}g PLA"]
-                if usar_argola:
-                    insumos_detalhe.append(f"{qtd_argola}x Argola")
-                if usar_nfc:
-                    insumos_detalhe.append(f"{qtd_nfc}x Tag NFC")
-
-                novo_item_cat = {
-                    "codigo": codigo_auto,
-                    "nome": nome_prod,
-                    "categoria": categoria_prod,
-                    "horas_imp": int(horas_imp),
-                    "minutos_imp": int(minutos_imp),
-                    "gramas_pla": float(gramas_pla),
-                    "usar_argola": usar_argola,
-                    "qtd_argola": int(qtd_argola),
-                    "usar_nfc": usar_nfc,
-                    "qtd_nfc": int(qtd_nfc),
-                    "insumos": ", ".join(insumos_detalhe),
-                    "custo_estimado": float(custo_total_est),
-                    "foto": caminho_foto
-                }
-
-                if is_edit_cat:
-                    st.session_state["catalogo"][edit_idx_cat] = novo_item_cat
-                    st.session_state["edit_idx_catalogo"] = None
-                    msg = "Produto atualizado no catálogo!"
-                else:
-                    st.session_state["catalogo"].append(novo_item_cat)
-                    msg = "Produto cadastrado no catálogo!"
-
-                salvar_csv(ARQUIVO_CATALOGO, st.session_state["catalogo"], msg)
-                st.success(msg)
-                time.sleep(0.5)
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align: center;'>Escolha uma opção abaixo:</h4>", unsafe_allow_html=True)
+        
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("📊 Catálogo", use_container_width=True):
+                st.session_state["pagina"] = "Catálogo"
+                st.rerun()
+            if st.button("💰 Calcular", use_container_width=True):
+                st.session_state["pagina"] = "Calcular"
+                st.rerun()
+        with b2:
+            if st.button("🛒 Compras", use_container_width=True):
+                st.session_state["pagina"] = "Compras"
+                st.rerun()
+            if st.button("⚙️ Produção", use_container_width=True):
+                st.session_state["pagina"] = "Produção"
                 st.rerun()
 
-    if is_edit_cat:
-        if st.button("❌ Cancelar Edição"):
-            st.session_state["edit_idx_catalogo"] = None
-            st.rerun()
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    if st.button("📋 Alternar Visibilidade do Catálogo"):
-        st.session_state["mostrar_produtos_catalogo"] = not st.session_state["mostrar_produtos_catalogo"]
-
-    if st.session_state["mostrar_produtos_catalogo"]:
-        st.markdown("### 📋 Seus Produtos Cadastrados por Categoria")
-        if not st.session_state["catalogo"]:
-            st.info("Nenhum produto cadastrado no catálogo ainda.")
-        else:
-            for cat in categorias_produtos_lista:
-                prods_cat_lista = [(i, p) for i, p in enumerate(st.session_state["catalogo"]) if p.get("categoria") == cat]
-                if prods_cat_lista:
-                    with st.expander(f"📁 **{cat}** ({len(prods_cat_lista)} produtos)"):
-                        for idx, prod in prods_cat_lista:
-                            st.markdown(f"**🏷️ [{prod.get('codigo')}] {prod.get('nome')}**")
-                            col_detalhes, col_img = st.columns([3, 1])
-                            
-                            with col_detalhes:
-                                st.write(f"• **Tempo de Impressão:** {prod.get('horas_imp', 0)}h {prod.get('minutos_imp', 0)}min")
-                                st.write(f"• **Peso de PLA:** {prod.get('gramas_pla', 0)} g")
-                                st.write(f"• **Insumos:** {prod.get('insumos')}")
-                                st.write(f"• **Custo Estimado:** € {float(prod.get('custo_estimado', 0.0)):.2f}")
-                            
-                            with col_img:
-                                foto_path = str(prod.get("foto", "")).strip()
-                                codigo_prod = str(prod.get("codigo", "")).strip()
-                                foto_final = None
-
-                                if foto_path and os.path.exists(foto_path):
-                                    foto_final = foto_path
-                                else:
-                                    if os.path.exists(PASTA_IMAGENS):
-                                        for arq in os.listdir(PASTA_IMAGENS):
-                                            if arq.lower().startswith(codigo_prod.lower() + "."):
-                                                candidato = os.path.join(PASTA_IMAGENS, arq)
-                                                if os.path.exists(candidato):
-                                                    foto_final = candidato
-                                                    break
-
-                                if foto_final:
-                                    st.image(foto_final, use_container_width=True)
-                                else:
-                                    st.caption("Sem foto")
-
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                if st.button("✏️ Editar", key=f"edit_cat_{idx}"):
-                                    st.session_state["edit_idx_catalogo"] = idx
-                                    st.rerun()
-                            with c2:
-                                if st.button("🗑️ Excluir", key=f"del_cat_{idx}"):
-                                    st.session_state["catalogo"].pop(idx)
-                                    salvar_csv(ARQUIVO_CATALOGO, st.session_state["catalogo"], "Produto excluído do catálogo")
-                                    st.rerun()
-                            st.markdown("---")
-
 # ==========================================
-# PÁGINA 2: CALCULADORA / PRECIFICAÇÃO
+# 2. CATÁLOGO DE PRODUTOS
 # ==========================================
-elif opcao_menu == "Calculadora / Precificação":
-    renderizar_cabecalho("CALCULADORA DE PRECIFICAÇÃO")
+elif st.session_state["pagina"] == "Catálogo":
+    st.markdown("## 📊 Catálogo de Produtos")
     st.markdown("---")
-    st.info("Simule custos avulsos de impressão e margem de lucro para novos projetos.")
     
-    col_calc1, col_calc2 = st.columns(2)
-    with col_calc1:
-        Calc_horas = st.number_input("Horas de Impressão", min_value=0.0, value=2.0, step=0.5)
-        Calc_gramas = st.number_input("Gramas de Filamento (PLA)", min_value=0.0, value=30.0, step=5.0)
-    with col_calc2:
-        Calc_margem = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, value=100.0, step=10.0)
-        custo_calc_total = (Calc_gramas * 0.025) + (Calc_horas * 0.50) # Exemplo base de cálculo
-        preco_venda = custo_calc_total * (1 + (Calc_margem / 100))
+    if st.button("⬅️ Voltar para a Página Inicial"):
+        st.session_state["pagina"] = "Início"
+        st.rerun()
         
-        st.markdown(f"### 💶 Custo Total: € {custo_calc_total:.2f}")
-        st.markdown(f"### 🏷️ Preço de Venda Sugerido: € {preco_venda:.2f}")
-
-# ==========================================
-# PÁGINA 3: CADASTRAR MATERIAL COMPRADO
-# ==========================================
-elif opcao_menu == "Cadastrar Material Comprado":
-    renderizar_cabecalho("CADASTRO DE COMPRAS DE INSUMOS")
-    st.markdown("---")
-    
-    with st.form("form_compras"):
-        tipo_material = st.selectbox("Tipo de Material", ["PLA", "NFC", "Argola", "Outros"])
-        quantidade = st.number_input("Quantidade (ex: 1 para 1kg ou 100 para unidades)", min_value=0.1, value=1.0)
-        unidade = st.selectbox("Unidade", ["KG", "Gramas", "Unidades"])
-        custo_total = st.number_input("Custo Total Pago (€)", min_value=0.0, value=20.0)
-        
-        if st.form_submit_button("Registrar Compra"):
-            nova_compra = {
-                "tipo_material": tipo_material,
-                "quantidade": quantidade,
-                "unidade": unidade,
-                "custo_total": custo_total
-            }
-            st.session_state["compras"].append(nova_compra)
-            salvar_csv(ARQUIVO_COMPRAS, st.session_state["compras"], "Compra registrada com sucesso!")
-            st.success("Compra registrada com sucesso!")
-            time.sleep(0.5)
-            st.rerun()
-            
-    if st.session_state["compras"]:
-        st.markdown("### 📦 Histórico de Compras")
-        df_c = pd.DataFrame(st.session_state["compras"])
-        st.dataframe(df_c, use_container_width=True)
-
-# ==========================================
-# PÁGINA 4: CADASTRAR PRODUÇÃO
-# ==========================================
-elif opcao_menu == "Cadastrar Produção":
-    renderizar_cabecalho("REGISTRO DE PRODUÇÃO")
-    st.markdown("---")
-    st.info("Registre lotes impressos e vincule aos produtos do catálogo.")
-    
     if not st.session_state["catalogo"]:
-        st.warning("Cadastre produtos no catálogo primeiro para registrar produções.")
+        st.info("Nenhum produto cadastrado ainda.")
     else:
-        nomes_prods = [p["nome"] for p in st.session_state["catalogo"]]
-        prod_escolhido = st.selectbox("Selecione o Produto Produzido", nomes_prods)
-        qtd_produzida = st.number_input("Quantidade Produzida", min_value=1, value=1, step=1)
+        for cat in categorias_produtos_lista:
+            prods = [p for p in st.session_state["catalogo"] if p.get("categoria") == cat]
+            if prods:
+                with st.expander(f"📁 **{cat}** ({len(prods)} produtos)"):
+                    for idx, prod in enumerate(prods):
+                        st.markdown(f"**🏷️ [{prod.get('codigo')}] {prod.get('nome')}**")
+                        c1, c2 = st.columns([3, 1])
+                        with c1:
+                            st.write(f"• **Peso PLA:** {prod.get('gramas_pla', 0)}g")
+                            st.write(f"• **Custo Estimado:** € {float(prod.get('custo_estimado', 0.0)):.2f}")
+                        with c2:
+                            foto = str(prod.get("foto", ""))
+                            if foto and os.path.exists(foto):
+                                st.image(foto, use_container_width=True)
+                            else:
+                                st.caption("Sem foto")
+                        st.markdown("---")
+
+# ==========================================
+# 3. CALCULADORA
+# ==========================================
+elif st.session_state["pagina"] == "Calcular":
+    st.markdown("## 💰 Calculadora de Precificação")
+    st.markdown("---")
+    
+    if st.button("⬅️ Voltar para a Página Inicial"):
+        st.session_state["pagina"] = "Início"
+        st.rerun()
         
-        if st.button("Confirmar Produção"):
-            st.success(f"Registrada a produção de {qtd_produzida} unidade(s) de '{prod_escolhido}'!")
+    c1, c2 = st.columns(2)
+    with c1:
+        gramas = st.number_input("Gramas de PLA", min_value=0.0, value=50.0)
+        horas = st.number_input("Horas de Impressão", min_value=0.0, value=3.0)
+    with c2:
+        margem = st.number_input("Margem de Lucro (%)", min_value=0.0, value=100.0)
+        custo = (gramas * 0.025) + (horas * 0.50)
+        venda = custo * (1 + (margem / 100))
+        st.markdown(f"### Custo: € {custo:.2f}")
+        st.markdown(f"### Venda Sugerida: € {venda:.2f}")
+
+# ==========================================
+# 4. COMPRAS
+# ==========================================
+elif st.session_state["pagina"] == "Compras":
+    st.markdown("## 🛒 Cadastro de Compras")
+    st.markdown("---")
+    
+    if st.button("⬅️ Voltar para a Página Inicial"):
+        st.session_state["pagina"] = "Início"
+        st.rerun()
+        
+    with st.form("form_compra"):
+        material = st.selectbox("Material", ["PLA", "NFC", "Argola", "Outros"])
+        qtd = st.number_input("Quantidade", min_value=0.1, value=1.0)
+        total = st.number_input("Custo Total (€)", min_value=0.0, value=20.0)
+        if st.form_submit_button("Salvar Compra"):
+            st.session_state["compras"].append({"material": material, "quantidade": qtd, "custo_total": total})
+            salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])
+            st.success("Compra salva!")
+            st.rerun()
+
+# ==========================================
+# 5. PRODUÇÃO
+# ==========================================
+elif st.session_state["pagina"] == "Produção":
+    st.markdown("## ⚙️ Registro de Produção")
+    st.markdown("---")
+    
+    if st.button("⬅️ Voltar para a Página Inicial"):
+        st.session_state["pagina"] = "Início"
+        st.rerun()
+        
+    st.info("Módulo de produção pronto para novos registros.")

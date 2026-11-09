@@ -223,18 +223,22 @@ elif st.session_state["pagina"] == "Catálogo":
             gramas_pla = st.number_input("Gramas de PLA utilizadas", min_value=0.0, value=float(produto_em_edicao.get("gramas_pla", 30.0)), step=1.0)
             horas_imp = st.number_input("Horas de Impressão", min_value=0.0, value=float(produto_em_edicao.get("horas_imp", 2.0)), step=0.5)
 
+        # <--- É AQUI DENTRO QUE ESSE BLOCO ENTRA (na segunda coluna) --->
         with col_cad2:
             st.markdown("##### 🔌 Extras / Componentes Opcionais")
             extras_atuais = produto_em_edicao.get("extras", "")
             
+            # Bloco da Tag NFC
             usa_nfc = st.checkbox("Tag NFC", value="NFC:" in extras_atuais)
             desc_nfc = st.text_input("Detalhe Tag NFC", value="NTAG216" if usa_nfc else "") if usa_nfc else ""
             custo_nfc = st.number_input("Custo NFC (€)", min_value=0.0, value=0.30) if usa_nfc else 0.0
 
+            # Bloco da Argola
             usa_argola = st.checkbox("Argola", value="Argola:" in extras_atuais)
             desc_argola = st.text_input("Detalhe Argola", value="12mm" if usa_argola else "") if usa_argola else ""
             custo_argola = st.number_input("Custo Argola (€)", min_value=0.0, value=0.10) if usa_argola else 0.0
 
+            # Bloco de Outros
             usa_outros = st.checkbox("Outros Extras", value="Outros:" in extras_atuais)
             desc_outros = st.text_input("Descrição de Outros", value="" if not usa_outros else "Extra") if usa_outros else ""
             custo_outros = st.number_input("Custo Outros (€)", min_value=0.0, value=0.0) if usa_outros else 0.0
@@ -243,90 +247,6 @@ elif st.session_state["pagina"] == "Catálogo":
 
             st.markdown("##### 📸 Foto do Produto")
             foto_upload = st.file_uploader("Fazer Upload da Imagem", type=["jpg", "jpeg", "png"])
-
-        botao_texto = "Salvar Alterações" if is_editing else "Salvar Novo Produto no Catálogo"
-        if st.form_submit_button(botao_texto):
-            if not nome_prod:
-                st.error("Por favor, preencha o Nome do Produto.")
-            else:
-                caminho_foto = produto_em_edicao.get("foto", "")
-                if foto_upload is not None:
-                    ext = foto_upload.name.split(".")[-1]
-                    caminho_foto = os.path.join(PASTA_IMAGENS, f"{codigo_automatico}.{ext}")
-                    with open(caminho_foto, "wb") as f:
-                        f.write(foto_upload.getbuffer())
-
-                custo_pla = gramas_pla * 0.02
-                custo_horas = horas_imp * 1.00
-                custo_total = custo_pla + custo_horas + custo_nfc + custo_argola + custo_outros
-                preco_final = custo_total * (1 + (margem_lucro / 100))
-
-                novo_item = {
-                    "codigo": codigo_automatico,
-                    "nome": nome_prod,
-                    "categoria": categoria_prod,
-                    "gramas_pla": gramas_pla,
-                    "horas_imp": horas_imp,
-                    "extras": f"NFC: {desc_nfc} | Argola: {desc_argola} | Outros: {desc_outros}",
-                    "preco_calculado": round(preco_final, 2),
-                    "foto": caminho_foto
-                }
-
-                if is_editing:
-                    st.session_state["catalogo"][edit_idx] = novo_item
-                    st.session_state["edit_idx_catalogo"] = None
-                    msg = f"Produto '{nome_prod}' atualizado com sucesso!"
-                else:
-                    st.session_state["catalogo"].append(novo_item)
-                    msg = f"Produto '{nome_prod}' cadastrado com sucesso no catálogo!"
-
-                salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
-                st.success(msg)
-                st.rerun()
-
-    if is_editing:
-        if st.button("❌ Cancelar Edição"):
-            st.session_state["edit_idx_catalogo"] = None
-            st.rerun()
-
-    st.markdown("---")
-    st.markdown("### 📂 Produtos Cadastrados por Categoria")
-    
-    if not st.session_state["catalogo"]:
-        st.info("Nenhum produto cadastrado no catálogo ainda.")
-    else:
-        for cat in categorias_produtos_lista:
-            prods_filtrados = [p for p in st.session_state["catalogo"] if str(p.get("categoria")).strip() == cat]
-            
-            if prods_filtrados:
-                with st.expander(f"📁 **{cat}** ({len(prods_filtrados)} produtos)"):
-                    for idx, prod in enumerate(prods_filtrados):
-                        st.markdown(f"**🏷️ [{prod.get('codigo')}] {prod.get('nome')}**")
-                        c1, c2 = st.columns([3, 1])
-                        with c1:
-                            st.write(f"• **PLA:** {prod.get('gramas_pla', 0)}g | **Tempo:** {prod.get('horas_imp', 0)}h")
-                            st.write(f"• **Extras:** {prod.get('extras', 'Nenhum')}")
-                            st.markdown(f"• **Preço Calculado / Venda:** **€ {float(prod.get('preco_calculado', 0.0)):.2f}**")
-                        with c2:
-                            foto_p = str(prod.get("foto", ""))
-                            if foto_p and os.path.exists(foto_p):
-                                st.image(foto_p, use_container_width=True)
-                            else:
-                                st.caption("Sem foto")
-                        
-                        col_b1, col_b2 = st.columns(2)
-                        with col_b1:
-                            real_idx = st.session_state["catalogo"].index(prod)
-                            if st.button("✏️ Editar", key=f"edit_btn_{real_idx}"):
-                                st.session_state["edit_idx_catalogo"] = real_idx
-                                st.rerun()
-                        with col_b2:
-                            if st.button("🗑️ Excluir", key=f"del_btn_{real_idx}"):
-                                st.session_state["catalogo"].remove(prod)
-                                salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
-                                st.success("Produto removido!")
-                                st.rerun()
-                        st.markdown("---")
 
 # ==========================================
 # 3. CALCULADORA

@@ -18,6 +18,15 @@ os.makedirs(PASTA_IMAGENS, exist_ok=True)
 # Categorias oficiais e separadas
 categorias_produtos_lista = ["Decoração", "Utilidades", "Acessórios", "Natal", "Laços", "Outros"]
 
+# Garante a criação inicial dos arquivos CSV se não existirem (evita erro de download)
+for arquivo, colunas in [
+    (ARQUIVO_CATALOGO, ["codigo", "nome", "categoria", "gramas_pla", "horas_imp", "extras", "preco_calculado", "foto"]),
+    (ARQUIVO_COMPRAS, ["material", "data_compra", "variedade", "quantidade", "unidade", "valor_compra", "identificacao_nota"]),
+    (ARQUIVO_PRODUCAO, ["codigo", "nome_produto", "categoria", "quantidade", "data_producao", "valor_total_lote"])
+]:
+    if not os.path.exists(arquivo):
+        pd.DataFrame(columns=colunas).to_csv(arquivo, index=False)
+
 def obter_prefixo_categoria(cat_str):
     """Retorna o prefixo exato de acordo com a categoria"""
     c = str(cat_str).strip().lower()
@@ -238,7 +247,7 @@ elif st.session_state["pagina"] == "Catálogo":
     form_titulo = "✏️ Alterar Dados do Produto" if is_editing else "➕ Cadastrar Novo Produto no Catálogo"
     st.markdown(f"### {form_titulo}")
     
-    # Seleção de categoria fora do form para atualizar o código automático instantaneamente
+    # Seleção de categoria fora do form para atualizar o código e o cálculo instantaneamente
     cat_atual = produto_em_edicao.get("categoria", categorias_produtos_lista[0])
     cat_idx = categorias_produtos_lista.index(cat_atual) if cat_atual in categorias_produtos_lista else 0
     categoria_prod = st.selectbox("Categoria", categorias_produtos_lista, index=cat_idx, key="select_cat_cadastro")
@@ -283,6 +292,20 @@ elif st.session_state["pagina"] == "Catálogo":
             st.markdown("##### 📸 Foto do Produto")
             foto_upload = st.file_uploader("Fazer Upload da Imagem", type=["jpg", "jpeg", "png"])
 
+        # Prévia do cálculo em tempo real dentro do form
+        c_pla_preview = gramas_pla * custo_g_pla_global
+        c_horas_preview = horas_imp * custo_h_imp_global
+        c_extras_preview = (custo_nfc if usa_nfc else 0.0) + (custo_argola if usa_argola else 0.0) + (custo_outros if usa_outros else 0.0)
+        custo_total_preview = c_pla_preview + c_horas_preview + c_extras_preview
+        preco_final_preview = custo_total_preview * (1 + (margem_lucro / 100))
+
+        st.markdown("---")
+        m1, m2 = st.columns(2)
+        with m1:
+            st.metric(label="💡 Custo de Produção (Prévia)", value=f"€ {custo_total_preview:.2f}")
+        with m2:
+            st.metric(label="💰 Preço de Venda (Prévia)", value=f"€ {preco_final_preview:.2f}")
+
         botao_texto = "Salvar Alterações" if is_editing else "Salvar Novo Produto no Catálogo"
         if st.form_submit_button(botao_texto):
             if not nome_prod:
@@ -295,12 +318,6 @@ elif st.session_state["pagina"] == "Catálogo":
                     with open(caminho_foto, "wb") as f:
                         f.write(foto_upload.getbuffer())
 
-                # Utiliza os custos globais do menu lateral
-                custo_pla = gramas_pla * custo_g_pla_global
-                custo_horas = horas_imp * custo_h_imp_global
-                custo_total = custo_pla + custo_horas + custo_nfc + custo_argola + custo_outros
-                preco_final = custo_total * (1 + (margem_lucro / 100))
-
                 novo_item = {
                     "codigo": codigo_automatico,
                     "nome": nome_prod,
@@ -308,7 +325,7 @@ elif st.session_state["pagina"] == "Catálogo":
                     "gramas_pla": gramas_pla,
                     "horas_imp": horas_imp,
                     "extras": f"NFC: {desc_nfc} | Argola: {desc_argola} | Outros: {desc_outros}",
-                    "preco_calculado": round(preco_final, 2),
+                    "preco_calculado": round(preco_final_preview, 2),
                     "foto": caminho_foto
                 }
 
@@ -369,7 +386,7 @@ elif st.session_state["pagina"] == "Catálogo":
                         st.markdown("---")
 
 # ==========================================
-# 3. CALCULADORA (UTILIZA CUSTOS GLOBAIS)
+# 3. CALCULADORA
 # ==========================================
 elif st.session_state["pagina"] == "Calcular":
     st.markdown("## 💰 Calculadora de Precificação")
@@ -379,7 +396,7 @@ elif st.session_state["pagina"] == "Calcular":
         st.session_state["pagina"] = "Início"
         st.rerun()
         
-    st.info(f"⚙️ **Custos Base Atuais (Definidos no Menu Lateral):** PLA = € {st.session_state['global_preco_kg_pla']:.2f} / KG (€ {custo_g_pla_global:.4f}/g) | Hora = € {custo_h_imp_global:.2f} / h")
+    st.info(f"⚙️ **Custos Base Atuais (Menu Lateral):** PLA = € {st.session_state['global_preco_kg_pla']:.2f} / KG (€ {custo_g_pla_global:.4f}/g) | Hora = € {custo_h_imp_global:.2f} / h")
     st.markdown("---")
     st.markdown("### 🖨️ Simulação de Projeto")
     
@@ -404,7 +421,6 @@ elif st.session_state["pagina"] == "Calcular":
         
         margem = st.number_input("Margem de Lucro (%)", min_value=0.0, value=100.0, step=10.0)
 
-    # Cálculos unificados baseados no menu lateral
     custo_pla = gramas * custo_g_pla_global
     custo_horas = horas * custo_h_imp_global
     custo_total = custo_pla + custo_horas + (qtd_nfc * custo_nfc) + (qtd_argola * custo_argola) + outros_custos

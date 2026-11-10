@@ -259,7 +259,6 @@ elif st.session_state["pagina"] == "Catálogo":
         proximo_num = len(prods_mesma_cat) + 1
         codigo_automatico = f"{prefixo}-{proximo_num:03d}"
 
-    # Campos fora do formulário estático para permitir reatividade em tempo real
     col_cad1, col_cad2 = st.columns(2)
     
     with col_cad1:
@@ -290,7 +289,7 @@ elif st.session_state["pagina"] == "Catálogo":
         st.markdown("##### 📸 Foto do Produto")
         foto_upload = st.file_uploader("Fazer Upload da Imagem", type=["jpg", "jpeg", "png"])
 
-    # Cálculo dinâmico em tempo real atualizando na tela conforme você mexe nos números
+    # Cálculo dinâmico em tempo real exibindo AMBOS os valores
     c_pla_preview = gramas_pla * custo_g_pla_global
     c_horas_preview = horas_imp * custo_h_imp_global
     c_extras_preview = (custo_nfc if usa_nfc else 0.0) + (custo_argola if usa_argola else 0.0) + (custo_outros if usa_outros else 0.0)
@@ -298,11 +297,12 @@ elif st.session_state["pagina"] == "Catálogo":
     preco_final_preview = custo_total_preview * (1 + (margem_lucro / 100))
 
     st.markdown("---")
+    st.markdown("### 🏷️ Resumo de Valores em Tempo Real")
     m1, m2 = st.columns(2)
     with m1:
-        st.metric(label="💡 Custo de Produção (Tempo real)", value=f"€ {custo_total_preview:.2f}")
+        st.metric(label="⚙️ Custo de Produção (Insumos + Tempo)", value=f"€ {custo_total_preview:.2f}")
     with m2:
-        st.metric(label="💰 Preço de Venda (Tempo real)", value=f"€ {preco_final_preview:.2f}")
+        st.metric(label=f"💰 Preço de Venda (Com {margem_lucro:.0f}% de Lucro)", value=f"€ {preco_final_preview:.2f}")
 
     st.markdown("<br>", unsafe_allow_html=True)
     botao_texto = "💾 Salvar Alterações" if is_editing else "💾 Salvar Novo Produto no Catálogo"
@@ -364,18 +364,29 @@ elif st.session_state["pagina"] == "Catálogo":
                     for idx, prod in enumerate(prods_filtrados):
                         g_prod = float(prod.get("gramas_pla", 0.0))
                         h_prod = float(prod.get("horas_imp", 0.0))
+                        
                         c_pla_val = g_prod * custo_g_pla_global
                         c_hora_val = h_prod * custo_h_imp_global
                         
                         extras_str = str(prod.get("extras", ""))
-                        preco_venda_atual = float(prod.get("preco_calculado", 0.0))
+                        extra_val = 0.0
+                        if "€" in extras_str:
+                            import re
+                            valores_extras = re.findall(r"€([0-9.]+)", extras_str)
+                            extra_val = sum([float(v) for v in valores_extras])
+                        elif "NFC" in extras_str or "Argola" in extras_str:
+                            extra_val = 0.40
+                        
+                        custo_total_prod = c_pla_val + c_hora_val + extra_val
+                        preco_venda_atual = custo_total_prod * 2.0  # 100% de ganho
 
                         st.markdown(f"**🏷️ [{prod.get('codigo')}] {prod.get('nome')}**")
                         c1, c2 = st.columns([3, 1])
                         with c1:
                             st.write(f"• **PLA:** {g_prod}g | **Tempo:** {h_prod}h")
                             st.write(f"• **Extras:** {extras_str if extras_str else 'Nenhum'}")
-                            st.markdown(f"• **Preço de Venda:** **€ {preco_venda_atual:.2f}**")
+                            st.markdown(f"• **Custo de Produção:** € {custo_total_prod:.2f}")
+                            st.markdown(f"• **Preço de Venda (100%):** **€ {preco_venda_atual:.2f}**")
                         with c2:
                             foto_p = str(prod.get("foto", ""))
                             if foto_p and os.path.exists(foto_p):
@@ -525,7 +536,9 @@ elif st.session_state["pagina"] == "Produção":
         
         prod_atual = next((p for p in st.session_state["catalogo"] if p["nome"] == produto_escolhido), {})
         
-        preco_unit = float(prod_atual.get("preco_calculado", 0.0))
+        g_prod = float(prod_atual.get("gramas_pla", 0.0))
+        h_prod = float(prod_atual.get("horas_imp", 0.0))
+        preco_unit = (g_prod * custo_g_pla_global + h_prod * custo_h_imp_global) * 2.0
         
         col_p1, col_p2 = st.columns(2)
         with col_p1:
@@ -537,7 +550,7 @@ elif st.session_state["pagina"] == "Produção":
             data_producao = st.date_input("Data da Produção", value=date.today())
             
         with col_p2:
-            st.metric(label="Preço Unitário", value=f"€ {preco_unit:.2f}")
+            st.metric(label="Preço Unitário (100%)", value=f"€ {preco_unit:.2f}")
             st.metric(label="Valor Total do Lote", value=f"€ {preco_unit * quantidade_lote:.2f}")
             
             foto_p = str(prod_atual.get("foto", ""))

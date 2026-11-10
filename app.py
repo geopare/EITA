@@ -18,7 +18,7 @@ os.makedirs(PASTA_IMAGENS, exist_ok=True)
 # Categorias oficiais e separadas
 categorias_produtos_lista = ["Decoração", "Utilidades", "Acessórios", "Natal", "Laços", "Outros"]
 
-# Garante a criação inicial dos arquivos CSV se não existirem (evita erro de download)
+# Garante a criação inicial dos arquivos CSV se não existirem
 for arquivo, colunas in [
     (ARQUIVO_CATALOGO, ["codigo", "nome", "categoria", "gramas_pla", "horas_imp", "extras", "preco_calculado", "foto"]),
     (ARQUIVO_COMPRAS, ["material", "data_compra", "variedade", "quantidade", "unidade", "valor_compra", "identificacao_nota"]),
@@ -247,12 +247,10 @@ elif st.session_state["pagina"] == "Catálogo":
     form_titulo = "✏️ Alterar Dados do Produto" if is_editing else "➕ Cadastrar Novo Produto no Catálogo"
     st.markdown(f"### {form_titulo}")
     
-    # Seleção de categoria fora do form para atualizar o código e o cálculo instantaneamente
     cat_atual = produto_em_edicao.get("categoria", categorias_produtos_lista[0])
     cat_idx = categorias_produtos_lista.index(cat_atual) if cat_atual in categorias_produtos_lista else 0
     categoria_prod = st.selectbox("Categoria", categorias_produtos_lista, index=cat_idx, key="select_cat_cadastro")
     
-    # Cálculo automático do código baseado na categoria escolhida
     if is_editing:
         codigo_automatico = produto_em_edicao.get("codigo", "SKU-001")
     else:
@@ -292,7 +290,6 @@ elif st.session_state["pagina"] == "Catálogo":
             st.markdown("##### 📸 Foto do Produto")
             foto_upload = st.file_uploader("Fazer Upload da Imagem", type=["jpg", "jpeg", "png"])
 
-        # Prévia do cálculo em tempo real dentro do form
         c_pla_preview = gramas_pla * custo_g_pla_global
         c_horas_preview = horas_imp * custo_h_imp_global
         c_extras_preview = (custo_nfc if usa_nfc else 0.0) + (custo_argola if usa_argola else 0.0) + (custo_outros if usa_outros else 0.0)
@@ -358,12 +355,25 @@ elif st.session_state["pagina"] == "Catálogo":
             if prods_filtrados:
                 with st.expander(f"📁 **{cat}** ({len(prods_filtrados)} produtos)"):
                     for idx, prod in enumerate(prods_filtrados):
+                        # Recalcula o preço em tempo real com base nos custos globais atuais e margem padrão de 100%
+                        g_prod = float(prod.get("gramas_pla", 0.0))
+                        h_prod = float(prod.get("horas_imp", 0.0))
+                        c_pla_val = g_prod * custo_g_pla_global
+                        c_hora_val = h_prod * custo_h_imp_global
+                        
+                        # Tenta estimar extras caso venha do antigo
+                        extras_str = str(prod.get("extras", ""))
+                        extra_val_estimado = 0.30 if "NFC" in extras_str and "NFC:  |" not in extras_str else 0.0
+                        
+                        custo_total_atual = c_pla_val + c_hora_val + extra_val_estimado
+                        preco_venda_atual = custo_total_atual * 2.0  # 100% de margem (custo * 2)
+
                         st.markdown(f"**🏷️ [{prod.get('codigo')}] {prod.get('nome')}**")
                         c1, c2 = st.columns([3, 1])
                         with c1:
-                            st.write(f"• **PLA:** {prod.get('gramas_pla', 0)}g | **Tempo:** {prod.get('horas_imp', 0)}h")
-                            st.write(f"• **Extras:** {prod.get('extras', 'Nenhum')}")
-                            st.markdown(f"• **Preço Calculado / Venda:** **€ {float(prod.get('preco_calculado', 0.0)):.2f}**")
+                            st.write(f"• **PLA:** {g_prod}g | **Tempo:** {h_prod}h")
+                            st.write(f"• **Extras:** {extras_str if extras_str else 'Nenhum'}")
+                            st.markdown(f"• **Preço Calculado / Venda (100%):** **€ {preco_venda_atual:.2f}**")
                         with c2:
                             foto_p = str(prod.get("foto", ""))
                             if foto_p and os.path.exists(foto_p):
@@ -513,6 +523,11 @@ elif st.session_state["pagina"] == "Produção":
         
         prod_atual = next((p for p in st.session_state["catalogo"] if p["nome"] == produto_escolhido), {})
         
+        # Recalcula o preço unitário com base nos custos globais atuais para a produção
+        g_prod = float(prod_atual.get("gramas_pla", 0.0))
+        h_prod = float(prod_atual.get("horas_imp", 0.0))
+        preco_unit = (g_prod * custo_g_pla_global + h_prod * custo_h_imp_global) * 2.0
+        
         col_p1, col_p2 = st.columns(2)
         with col_p1:
             codigo_prod = prod_atual.get("codigo", "SKU-000")
@@ -523,8 +538,7 @@ elif st.session_state["pagina"] == "Produção":
             data_producao = st.date_input("Data da Produção", value=date.today())
             
         with col_p2:
-            preco_unit = float(prod_atual.get("preco_calculado", 0.0))
-            st.metric(label="Preço Unitário Calculado", value=f"€ {preco_unit:.2f}")
+            st.metric(label="Preço Unitário Calculado (100%)", value=f"€ {preco_unit:.2f}")
             st.metric(label="Valor Total do Lote", value=f"€ {preco_unit * quantidade_lote:.2f}")
             
             foto_p = str(prod_atual.get("foto", ""))

@@ -18,6 +18,38 @@ os.makedirs(PASTA_IMAGENS, exist_ok=True)
 # Categorias oficiais e separadas
 categorias_produtos_lista = ["Decoração", "Utilidades", "Acessórios", "Natal", "Laços", "Outros"]
 
+def obter_prefixo_categoria(cat_str):
+    """Retorna o prefixo exato de acordo com a categoria"""
+    c = str(cat_str).strip().lower()
+    if "decor" in c:
+        return "DEC"
+    elif "util" in c:
+        return "UTI"
+    elif "acess" in c:
+        return "ACE"
+    elif "natal" in c:
+        return "NAT"
+    elif "laç" in c or "lac" in c:
+        return "LAC"
+    else:
+        return "OUT"
+
+def normalizar_categoria(cat_str):
+    """Padroniza e mapeia corretamente as categorias existentes"""
+    c = str(cat_str).strip().lower()
+    if "decor" in c:
+        return "Decoração"
+    elif "util" in c:
+        return "Utilidades"
+    elif "acess" in c:
+        return "Acessórios"
+    elif "natal" in c:
+        return "Natal"
+    elif "laç" in c or "lac" in c:
+        return "Laços"
+    else:
+        return "Outros"
+
 # ==========================================
 # GERENCIAMENTO DE ESTADO E CARREGAMENTO
 # ==========================================
@@ -33,26 +65,8 @@ if "mostrar_tabela_producao" not in st.session_state:
 if "edit_idx_catalogo" not in st.session_state:
     st.session_state["edit_idx_catalogo"] = None
 
-def normalizar_categoria(cat_str):
-    """Padroniza e mapeia corretamente as categorias existentes"""
-    c = str(cat_str).strip().lower()
-    if any(k in c for k in ["decor", "vaso", "planta"]):
-        return "Decoração"
-    elif any(k in c for k in ["util", "utilid"]):
-        return "Utilidades"
-    elif any(k in c for k in ["acess", "chaveiro", "suporte"]):
-        return "Acessórios"
-    elif any(k in c for k in ["natal", "bola", "pinheiro", "noel"]):
-        return "Natal"
-    elif any(k in c for k in ["laç", "lac", "laco"]):
-        return "Laços"
-    else:
-        return "Outros"
-
 def carregar_catalogo():
-    """Carrega e sincroniza o catálogo diretamente do CSV"""
     lista_carregada = []
-    
     if os.path.exists(ARQUIVO_CATALOGO):
         try:
             df_cat = pd.read_csv(ARQUIVO_CATALOGO)
@@ -68,10 +82,9 @@ def carregar_catalogo():
                     "preco_calculado": float(r.get("preco_calculado", r.get("producao", 0.0))),
                     "foto": str(r.get("foto", r.get("imagem", "")))
                 })
-        except Exception as e:
-            st.error(f"Erro ao ler catálogo: {e}")
+        except:
+            pass
 
-    # Se o catálogo principal estiver vazio, tenta importar do antigo
     if not lista_carregada and os.path.exists(ARQUIVO_ANTIGO):
         try:
             df_old = pd.read_csv(ARQUIVO_ANTIGO)
@@ -89,14 +102,11 @@ def carregar_catalogo():
                 })
         except:
             pass
-            
     return lista_carregada
 
-# Inicializa o catálogo na sessão
 if "catalogo" not in st.session_state or not st.session_state["catalogo"]:
     st.session_state["catalogo"] = carregar_catalogo()
 
-# Carrega Compras
 if "compras" not in st.session_state:
     if os.path.exists(ARQUIVO_COMPRAS):
         try:
@@ -106,7 +116,6 @@ if "compras" not in st.session_state:
     else:
         st.session_state["compras"] = []
 
-# Carrega Produção
 if "producao" not in st.session_state:
     if os.path.exists(ARQUIVO_PRODUCAO):
         try:
@@ -124,13 +133,30 @@ def salvar_dados(caminho, dados):
         st.error(f"Erro ao salvar arquivo {caminho}: {e}")
 
 # ==========================================
-# MENU LATERAL & DOWNLOAD DE ARQUIVOS
+# MENU LATERAL & CUSTOS BASE GLOBAIS
 # ==========================================
 st.sidebar.title("🖨️ Sistema EITA")
 menu_opcoes = ["Início", "Catálogo", "Calcular", "Compras", "Produção"]
 escolha_lateral = st.sidebar.radio("Navegação", menu_opcoes, index=menu_opcoes.index(st.session_state["pagina"]) if st.session_state["pagina"] in menu_opcoes else 0)
 
 st.session_state["pagina"] = escolha_lateral
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ⚙️ Custos Base Globais")
+if "global_preco_kg_pla" not in st.session_state:
+    st.session_state["global_preco_kg_pla"] = 20.00
+if "global_custo_h_imp" not in st.session_state:
+    st.session_state["global_custo_h_imp"] = 1.00
+
+st.session_state["global_preco_kg_pla"] = st.sidebar.number_input(
+    "Preço 1 KG PLA (€)", min_value=0.0, value=st.session_state["global_preco_kg_pla"], step=0.50, format="%.2f"
+)
+st.session_state["global_custo_h_imp"] = st.sidebar.number_input(
+    "Custo Hora Impressão (€/h)", min_value=0.0, value=st.session_state["global_custo_h_imp"], step=0.25, format="%.2f"
+)
+
+custo_g_pla_global = st.session_state["global_preco_kg_pla"] / 1000.0
+custo_h_imp_global = st.session_state["global_custo_h_imp"]
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📥 Downloads de Arquivos")
@@ -204,7 +230,7 @@ elif st.session_state["pagina"] == "Catálogo":
     with col_rec:
         if st.button("🔄 Atualizar Catálogo"):
             st.session_state["catalogo"] = carregar_catalogo()
-            st.success("Catálogo recarregado com sucesso!")
+            st.success("Catálogo recarregado!")
             st.rerun()
         
     produto_em_edicao = st.session_state["catalogo"][edit_idx] if is_editing else {}
@@ -212,25 +238,26 @@ elif st.session_state["pagina"] == "Catálogo":
     form_titulo = "✏️ Alterar Dados do Produto" if is_editing else "➕ Cadastrar Novo Produto no Catálogo"
     st.markdown(f"### {form_titulo}")
     
+    # Seleção de categoria fora do form para atualizar o código automático instantaneamente
+    cat_atual = produto_em_edicao.get("categoria", categorias_produtos_lista[0])
+    cat_idx = categorias_produtos_lista.index(cat_atual) if cat_atual in categorias_produtos_lista else 0
+    categoria_prod = st.selectbox("Categoria", categorias_produtos_lista, index=cat_idx, key="select_cat_cadastro")
+    
+    # Cálculo automático do código baseado na categoria escolhida
+    if is_editing:
+        codigo_automatico = produto_em_edicao.get("codigo", "SKU-001")
+    else:
+        prefixo = obter_prefixo_categoria(categoria_prod)
+        prods_mesma_cat = [p for p in st.session_state["catalogo"] if obter_prefixo_categoria(p.get("categoria")) == prefixo]
+        proximo_num = len(prods_mesma_cat) + 1
+        codigo_automatico = f"{prefixo}-{proximo_num:03d}"
+
     with st.form("form_catalogo_crud"):
         col_cad1, col_cad2 = st.columns(2)
         
         with col_cad1:
             nome_prod = st.text_input("Nome do Produto", value=produto_em_edicao.get("nome", ""), placeholder="Ex: Chaveiro Personalizado")
-            
-            cat_atual = produto_em_edicao.get("categoria", categorias_produtos_lista[0])
-            cat_idx = categorias_produtos_lista.index(cat_atual) if cat_atual in categorias_produtos_lista else 0
-            categoria_prod = st.selectbox("Categoria", categorias_produtos_lista, index=cat_idx)
-            
-            if is_editing:
-                codigo_automatico = produto_em_edicao.get("codigo", "SKU-001")
-            else:
-                prefixo = categoria_prod[:3].upper()
-                prods_mesma_cat = [p for p in st.session_state["catalogo"] if str(p.get("categoria")).strip() == categoria_prod]
-                proximo_num = len(prods_mesma_cat) + 1
-                codigo_automatico = f"{prefixo}-{proximo_num:03d}"
-            
-            st.text_input("Código do Produto", value=codigo_automatico, disabled=True)
+            st.text_input("Código Automático", value=codigo_automatico, disabled=True)
             
             gramas_pla = st.number_input("Gramas de PLA utilizadas", min_value=0.0, value=float(produto_em_edicao.get("gramas_pla", 30.0)), step=1.0)
             horas_imp = st.number_input("Horas de Impressão", min_value=0.0, value=float(produto_em_edicao.get("horas_imp", 2.0)), step=0.5)
@@ -268,8 +295,9 @@ elif st.session_state["pagina"] == "Catálogo":
                     with open(caminho_foto, "wb") as f:
                         f.write(foto_upload.getbuffer())
 
-                custo_pla = gramas_pla * 0.02
-                custo_horas = horas_imp * 1.00
+                # Utiliza os custos globais do menu lateral
+                custo_pla = gramas_pla * custo_g_pla_global
+                custo_horas = horas_imp * custo_h_imp_global
                 custo_total = custo_pla + custo_horas + custo_nfc + custo_argola + custo_outros
                 preco_final = custo_total * (1 + (margem_lucro / 100))
 
@@ -341,7 +369,7 @@ elif st.session_state["pagina"] == "Catálogo":
                         st.markdown("---")
 
 # ==========================================
-# 3. CALCULADORA
+# 3. CALCULADORA (UTILIZA CUSTOS GLOBAIS)
 # ==========================================
 elif st.session_state["pagina"] == "Calcular":
     st.markdown("## 💰 Calculadora de Precificação")
@@ -351,16 +379,7 @@ elif st.session_state["pagina"] == "Calcular":
         st.session_state["pagina"] = "Início"
         st.rerun()
         
-    st.markdown("### ⚙️ Custos Base")
-    col_base1, col_base2 = st.columns(2)
-    with col_base1:
-        preco_kg_pla = st.number_input("Valor pago por 1 KG de PLA (€)", min_value=0.0, value=20.00, step=0.50, format="%.2f")
-        custo_g_pla = preco_kg_pla / 1000.0  
-        st.caption(f"Custo por grama: **€ {custo_g_pla:.4f} / g**")
-    with col_base2:
-        custo_h_imp = st.number_input("Custo por Hora de Impressão (€/h)", min_value=0.00, value=1.00, step=0.25, format="%.2f")
-        st.caption("Referência Baden-Württemberg: € 1.00 / h")
-        
+    st.info(f"⚙️ **Custos Base Atuais (Definidos no Menu Lateral):** PLA = € {st.session_state['global_preco_kg_pla']:.2f} / KG (€ {custo_g_pla_global:.4f}/g) | Hora = € {custo_h_imp_global:.2f} / h")
     st.markdown("---")
     st.markdown("### 🖨️ Simulação de Projeto")
     
@@ -385,8 +404,9 @@ elif st.session_state["pagina"] == "Calcular":
         
         margem = st.number_input("Margem de Lucro (%)", min_value=0.0, value=100.0, step=10.0)
 
-    custo_pla = gramas * custo_g_pla
-    custo_horas = horas * custo_h_imp
+    # Cálculos unificados baseados no menu lateral
+    custo_pla = gramas * custo_g_pla_global
+    custo_horas = horas * custo_h_imp_global
     custo_total = custo_pla + custo_horas + (qtd_nfc * custo_nfc) + (qtd_argola * custo_argola) + outros_custos
     preco_venda = custo_total * (1 + (margem / 100))
     
@@ -415,3 +435,114 @@ elif st.session_state["pagina"] == "Compras":
         with col_c1:
             material = st.selectbox("Material", ["PLA", "Argolas", "NFC", "OUTROS"])
             data_compra = st.date_input("Data da Compra", value=date.today())
+            variedade = st.text_input("Variedade (Cor / Modelo / Marca)", placeholder="Ex: Azul Seda, 12mm, NTAG216")
+            
+        with col_c2:
+            col_q1, col_q2 = st.columns(2)
+            with col_q1:
+                qtd = st.number_input("Quantidade", min_value=0.01, value=1.0, step=1.0)
+            with col_q2:
+                unidade_medida = st.selectbox("Unidade", ["KG", "Unidades", "Gramas", "Metros"])
+                
+            valor_compra = st.number_input("Valor da Compra (€)", min_value=0.0, value=20.0, step=1.0)
+            identificacao_nota = st.text_input("Identificação da Nota (NF / Fatura)", placeholder="Ex: NF-12345")
+            
+        if st.form_submit_button("Salvar Compra"):
+            nova_compra = {
+                "material": material,
+                "data_compra": str(data_compra),
+                "variedade": variedade,
+                "quantidade": qtd,
+                "unidade": unidade_medida,
+                "valor_compra": valor_compra,
+                "identificacao_nota": identificacao_nota
+            }
+            st.session_state["compras"].append(nova_compra)
+            salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])
+            st.success("Compra cadastrada com sucesso!")
+            st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("📋 Ver / Ocultar Compras Salvas"):
+        st.session_state["mostrar_tabela_compras"] = not st.session_state["mostrar_tabela_compras"]
+
+    if st.session_state["mostrar_tabela_compras"]:
+        st.markdown("### 📦 Histórico de Compras")
+        if not st.session_state["compras"]:
+            st.info("Nenhuma compra registrada.")
+        else:
+            st.dataframe(pd.DataFrame(st.session_state["compras"]), use_container_width=True)
+            if st.button("🗑️ Apagar Última Compra"):
+                st.session_state["compras"].pop()
+                salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])
+                st.success("Removido!")
+                st.rerun()
+
+# ==========================================
+# 5. PRODUÇÃO
+# ==========================================
+elif st.session_state["pagina"] == "Produção":
+    st.markdown("## ⚙️ Registro de Produção de Lotes")
+    st.markdown("---")
+    
+    if st.button("⬅️ Voltar para a Página Inicial"):
+        st.session_state["pagina"] = "Início"
+        st.rerun()
+        
+    if not st.session_state["catalogo"]:
+        st.warning("⚠️ Cadastre produtos no Catálogo primeiro para poder registrar lotes de produção.")
+    else:
+        nomes_produtos = [p["nome"] for p in st.session_state["catalogo"]]
+        produto_escolhido = st.selectbox("Selecione o Produto do Catálogo", nomes_produtos)
+        
+        prod_atual = next((p for p in st.session_state["catalogo"] if p["nome"] == produto_escolhido), {})
+        
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            codigo_prod = prod_atual.get("codigo", "SKU-000")
+            st.text_input("Código", value=codigo_prod, disabled=True)
+            categoria_prod = prod_atual.get("categoria", "Outros")
+            st.text_input("Categoria", value=categoria_prod, disabled=True)
+            quantidade_lote = st.number_input("Quantidade no Lote", min_value=1, value=1, step=1)
+            data_producao = st.date_input("Data da Produção", value=date.today())
+            
+        with col_p2:
+            preco_unit = float(prod_atual.get("preco_calculado", 0.0))
+            st.metric(label="Preço Unitário Calculado", value=f"€ {preco_unit:.2f}")
+            st.metric(label="Valor Total do Lote", value=f"€ {preco_unit * quantidade_lote:.2f}")
+            
+            foto_p = str(prod_atual.get("foto", ""))
+            if foto_p and os.path.exists(foto_p):
+                st.image(foto_p, width=150, caption=produto_escolhido)
+            else:
+                st.caption("Sem foto.")
+                
+        if st.button("💾 Salvar Lote Produzido"):
+            nova_prod = {
+                "codigo": codigo_prod,
+                "nome_produto": produto_escolhido,
+                "categoria": categoria_prod,
+                "quantidade": quantidade_lote,
+                "data_producao": str(data_producao),
+                "valor_total_lote": round(preco_unit * quantidade_lote, 2)
+            }
+            st.session_state["producao"].append(nova_prod)
+            salvar_dados(ARQUIVO_PRODUCAO, st.session_state["producao"])
+            st.success("Produção registrada com sucesso!")
+            st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("📋 Ver / Ocultar Histórico de Produção"):
+        st.session_state["mostrar_tabela_producao"] = not st.session_state["mostrar_tabela_producao"]
+
+    if st.session_state["mostrar_tabela_producao"]:
+        st.markdown("### 📦 Lotes Produzidos")
+        if not st.session_state["producao"]:
+            st.info("Nenhum lote registrado.")
+        else:
+            st.dataframe(pd.DataFrame(st.session_state["producao"]), use_container_width=True)
+            if st.button("🗑️ Apagar Último Registro"):
+                st.session_state["producao"].pop()
+                salvar_dados(ARQUIVO_PRODUCAO, st.session_state["producao"])
+                st.success("Removido!")
+                st.rerun()

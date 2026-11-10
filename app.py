@@ -259,84 +259,91 @@ elif st.session_state["pagina"] == "Catálogo":
         proximo_num = len(prods_mesma_cat) + 1
         codigo_automatico = f"{prefixo}-{proximo_num:03d}"
 
-    with st.form("form_catalogo_crud"):
-        col_cad1, col_cad2 = st.columns(2)
+    # Campos fora do formulário estático para permitir reatividade em tempo real
+    col_cad1, col_cad2 = st.columns(2)
+    
+    with col_cad1:
+        nome_prod = st.text_input("Nome do Produto", value=produto_em_edicao.get("nome", ""), placeholder="Ex: Chaveiro Personalizado")
+        st.text_input("Código Automático", value=codigo_automatico, disabled=True)
         
-        with col_cad1:
-            nome_prod = st.text_input("Nome do Produto", value=produto_em_edicao.get("nome", ""), placeholder="Ex: Chaveiro Personalizado")
-            st.text_input("Código Automático", value=codigo_automatico, disabled=True)
-            
-            gramas_pla = st.number_input("Gramas de PLA utilizadas", min_value=0.0, value=float(produto_em_edicao.get("gramas_pla", 30.0)), step=1.0)
-            horas_imp = st.number_input("Horas de Impressão", min_value=0.0, value=float(produto_em_edicao.get("horas_imp", 2.0)), step=0.5)
+        gramas_pla = st.number_input("Gramas de PLA utilizadas", min_value=0.0, value=float(produto_em_edicao.get("gramas_pla", 30.0)), step=1.0)
+        horas_imp = st.number_input("Horas de Impressão", min_value=0.0, value=float(produto_em_edicao.get("horas_imp", 2.0)), step=0.5)
 
-        with col_cad2:
-            st.markdown("##### 🔌 Extras / Componentes Opcionais")
-            extras_atuais = produto_em_edicao.get("extras", "")
-            
-            usa_nfc = st.checkbox("Tag NFC", value="NFC:" in extras_atuais)
-            desc_nfc = st.text_input("Detalhe Tag NFC", value="NTAG216" if usa_nfc else "") if usa_nfc else ""
-            custo_nfc = st.number_input("Custo NFC (€)", min_value=0.0, value=0.30) if usa_nfc else 0.0
+    with col_cad2:
+        st.markdown("##### 🔌 Extras / Componentes Opcionais")
+        extras_atuais = produto_em_edicao.get("extras", "")
+        
+        usa_nfc = st.checkbox("Tag NFC", value="NFC:" in extras_atuais or "NTAG" in extras_atuais)
+        desc_nfc = st.text_input("Detalhe Tag NFC", value="NTAG216") if usa_nfc else ""
+        custo_nfc = st.number_input("Custo unitário NFC (€)", min_value=0.0, value=0.30) if usa_nfc else 0.0
 
-            usa_argola = st.checkbox("Argola", value="Argola:" in extras_atuais)
-            desc_argola = st.text_input("Detalhe Argola", value="12mm" if usa_argola else "") if usa_argola else ""
-            custo_argola = st.number_input("Custo Argola (€)", min_value=0.0, value=0.10) if usa_argola else 0.0
+        usa_argola = st.checkbox("Argola", value="Argola:" in extras_atuais or "mm" in extras_atuais)
+        desc_argola = st.text_input("Detalhe Argola", value="12mm") if usa_argola else ""
+        custo_argola = st.number_input("Custo unitário Argola (€)", min_value=0.0, value=0.10) if usa_argola else 0.0
 
-            usa_outros = st.checkbox("Outros Extras", value="Outros:" in extras_atuais)
-            desc_outros = st.text_input("Descrição de Outros", value="" if not usa_outros else "Extra") if usa_outros else ""
-            custo_outros = st.number_input("Custo Outros (€)", min_value=0.0, value=0.0) if usa_outros else 0.0
+        usa_outros = st.checkbox("Outros Extras", value="Outros:" in extras_atuais)
+        desc_outros = st.text_input("Descrição de Outros", value="Extra") if usa_outros else ""
+        custo_outros = st.number_input("Custo Outros (€)", min_value=0.0, value=0.0) if usa_outros else 0.0
 
-            margem_lucro = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, value=100.0, step=10.0)
+        margem_lucro = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, value=100.0, step=10.0)
 
-            st.markdown("##### 📸 Foto do Produto")
-            foto_upload = st.file_uploader("Fazer Upload da Imagem", type=["jpg", "jpeg", "png"])
+        st.markdown("##### 📸 Foto do Produto")
+        foto_upload = st.file_uploader("Fazer Upload da Imagem", type=["jpg", "jpeg", "png"])
 
-        c_pla_preview = gramas_pla * custo_g_pla_global
-        c_horas_preview = horas_imp * custo_h_imp_global
-        c_extras_preview = (custo_nfc if usa_nfc else 0.0) + (custo_argola if usa_argola else 0.0) + (custo_outros if usa_outros else 0.0)
-        custo_total_preview = c_pla_preview + c_horas_preview + c_extras_preview
-        preco_final_preview = custo_total_preview * (1 + (margem_lucro / 100))
+    # Cálculo dinâmico em tempo real atualizando na tela conforme você mexe nos números
+    c_pla_preview = gramas_pla * custo_g_pla_global
+    c_horas_preview = horas_imp * custo_h_imp_global
+    c_extras_preview = (custo_nfc if usa_nfc else 0.0) + (custo_argola if usa_argola else 0.0) + (custo_outros if usa_outros else 0.0)
+    custo_total_preview = c_pla_preview + c_horas_preview + c_extras_preview
+    preco_final_preview = custo_total_preview * (1 + (margem_lucro / 100))
 
-        st.markdown("---")
-        m1, m2 = st.columns(2)
-        with m1:
-            st.metric(label="💡 Custo de Produção (Prévia)", value=f"€ {custo_total_preview:.2f}")
-        with m2:
-            st.metric(label="💰 Preço de Venda (Prévia)", value=f"€ {preco_final_preview:.2f}")
+    st.markdown("---")
+    m1, m2 = st.columns(2)
+    with m1:
+        st.metric(label="💡 Custo de Produção (Tempo real)", value=f"€ {custo_total_preview:.2f}")
+    with m2:
+        st.metric(label="💰 Preço de Venda (Tempo real)", value=f"€ {preco_final_preview:.2f}")
 
-        botao_texto = "Salvar Alterações" if is_editing else "Salvar Novo Produto no Catálogo"
-        if st.form_submit_button(botao_texto):
-            if not nome_prod:
-                st.error("Por favor, preencha o Nome do Produto.")
+    st.markdown("<br>", unsafe_allow_html=True)
+    botao_texto = "💾 Salvar Alterações" if is_editing else "💾 Salvar Novo Produto no Catálogo"
+    
+    if st.button(botao_texto, use_container_width=True, type="primary"):
+        if not nome_prod:
+            st.error("Por favor, preencha o Nome do Produto.")
+        else:
+            caminho_foto = produto_em_edicao.get("foto", "")
+            if foto_upload is not None:
+                ext = foto_upload.name.split(".")[-1]
+                caminho_foto = os.path.join(PASTA_IMAGENS, f"{codigo_automatico}.{ext}")
+                with open(caminho_foto, "wb") as f:
+                    f.write(foto_upload.getbuffer())
+
+            desc_nfc_txt = desc_nfc if usa_nfc else "Não usa"
+            desc_argola_txt = desc_argola if usa_argola else "Não usa"
+            desc_outros_txt = desc_outros if usa_outros else "Não usa"
+
+            novo_item = {
+                "codigo": codigo_automatico,
+                "nome": nome_prod,
+                "categoria": categoria_prod,
+                "gramas_pla": gramas_pla,
+                "horas_imp": horas_imp,
+                "extras": f"NFC: {desc_nfc_txt} (€{custo_nfc}) | Argola: {desc_argola_txt} (€{custo_argola}) | Outros: {desc_outros_txt} (€{custo_outros})",
+                "preco_calculado": round(preco_final_preview, 2),
+                "foto": caminho_foto
+            }
+
+            if is_editing:
+                st.session_state["catalogo"][edit_idx] = novo_item
+                st.session_state["edit_idx_catalogo"] = None
+                msg = f"Produto '{nome_prod}' atualizado com sucesso!"
             else:
-                caminho_foto = produto_em_edicao.get("foto", "")
-                if foto_upload is not None:
-                    ext = foto_upload.name.split(".")[-1]
-                    caminho_foto = os.path.join(PASTA_IMAGENS, f"{codigo_automatico}.{ext}")
-                    with open(caminho_foto, "wb") as f:
-                        f.write(foto_upload.getbuffer())
+                st.session_state["catalogo"].append(novo_item)
+                msg = f"Produto '{nome_prod}' cadastrado com sucesso no catálogo!"
 
-                novo_item = {
-                    "codigo": codigo_automatico,
-                    "nome": nome_prod,
-                    "categoria": categoria_prod,
-                    "gramas_pla": gramas_pla,
-                    "horas_imp": horas_imp,
-                    "extras": f"NFC: {desc_nfc} | Argola: {desc_argola} | Outros: {desc_outros}",
-                    "preco_calculado": round(preco_final_preview, 2),
-                    "foto": caminho_foto
-                }
-
-                if is_editing:
-                    st.session_state["catalogo"][edit_idx] = novo_item
-                    st.session_state["edit_idx_catalogo"] = None
-                    msg = f"Produto '{nome_prod}' atualizado com sucesso!"
-                else:
-                    st.session_state["catalogo"].append(novo_item)
-                    msg = f"Produto '{nome_prod}' cadastrado com sucesso no catálogo!"
-
-                salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
-                st.success(msg)
-                st.rerun()
+            salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
+            st.success(msg)
+            st.rerun()
 
     if is_editing:
         if st.button("❌ Cancelar Edição"):
@@ -355,25 +362,20 @@ elif st.session_state["pagina"] == "Catálogo":
             if prods_filtrados:
                 with st.expander(f"📁 **{cat}** ({len(prods_filtrados)} produtos)"):
                     for idx, prod in enumerate(prods_filtrados):
-                        # Recalcula o preço em tempo real com base nos custos globais atuais e margem padrão de 100%
                         g_prod = float(prod.get("gramas_pla", 0.0))
                         h_prod = float(prod.get("horas_imp", 0.0))
                         c_pla_val = g_prod * custo_g_pla_global
                         c_hora_val = h_prod * custo_h_imp_global
                         
-                        # Tenta estimar extras caso venha do antigo
                         extras_str = str(prod.get("extras", ""))
-                        extra_val_estimado = 0.30 if "NFC" in extras_str and "NFC:  |" not in extras_str else 0.0
-                        
-                        custo_total_atual = c_pla_val + c_hora_val + extra_val_estimado
-                        preco_venda_atual = custo_total_atual * 2.0  # 100% de margem (custo * 2)
+                        preco_venda_atual = float(prod.get("preco_calculado", 0.0))
 
                         st.markdown(f"**🏷️ [{prod.get('codigo')}] {prod.get('nome')}**")
                         c1, c2 = st.columns([3, 1])
                         with c1:
                             st.write(f"• **PLA:** {g_prod}g | **Tempo:** {h_prod}h")
                             st.write(f"• **Extras:** {extras_str if extras_str else 'Nenhum'}")
-                            st.markdown(f"• **Preço Calculado / Venda (100%):** **€ {preco_venda_atual:.2f}**")
+                            st.markdown(f"• **Preço de Venda:** **€ {preco_venda_atual:.2f}**")
                         with c2:
                             foto_p = str(prod.get("foto", ""))
                             if foto_p and os.path.exists(foto_p):
@@ -523,10 +525,7 @@ elif st.session_state["pagina"] == "Produção":
         
         prod_atual = next((p for p in st.session_state["catalogo"] if p["nome"] == produto_escolhido), {})
         
-        # Recalcula o preço unitário com base nos custos globais atuais para a produção
-        g_prod = float(prod_atual.get("gramas_pla", 0.0))
-        h_prod = float(prod_atual.get("horas_imp", 0.0))
-        preco_unit = (g_prod * custo_g_pla_global + h_prod * custo_h_imp_global) * 2.0
+        preco_unit = float(prod_atual.get("preco_calculado", 0.0))
         
         col_p1, col_p2 = st.columns(2)
         with col_p1:
@@ -538,7 +537,7 @@ elif st.session_state["pagina"] == "Produção":
             data_producao = st.date_input("Data da Produção", value=date.today())
             
         with col_p2:
-            st.metric(label="Preço Unitário Calculado (100%)", value=f"€ {preco_unit:.2f}")
+            st.metric(label="Preço Unitário", value=f"€ {preco_unit:.2f}")
             st.metric(label="Valor Total do Lote", value=f"€ {preco_unit * quantidade_lote:.2f}")
             
             foto_p = str(prod_atual.get("foto", ""))

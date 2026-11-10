@@ -9,13 +9,14 @@ st.set_page_config(page_title="Gestão EITA", page_icon="🖨️", layout="wide"
 # Caminhos dos arquivos e pastas
 PASTA_IMAGENS = "imagens"
 ARQUIVO_CATALOGO = "catalogo_produtos.csv"
+ARQUIVO_ANTIGO = "produtos_3d.csv"
 ARQUIVO_COMPRAS = "compras_insumos.csv"
 ARQUIVO_PRODUCAO = "producao_lotes.csv"
 
 os.makedirs(PASTA_IMAGENS, exist_ok=True)
 
-# Categorias solicitadas
-categorias_produtos_lista = ["Acessórios", "Utilidades", "Natal", "Laços", "Outros"]
+# Categorias oficiais e separadas
+categorias_produtos_lista = ["Decoração", "Utilidades", "Acessórios", "Natal", "Laços", "Outros"]
 
 # ==========================================
 # GERENCIAMENTO DE ESTADO E CARREGAMENTO
@@ -29,16 +30,71 @@ if "mostrar_tabela_compras" not in st.session_state:
 if "mostrar_tabela_producao" not in st.session_state:
     st.session_state["mostrar_tabela_producao"] = True
 
-# Carrega Catálogo com tratamento robusto
-if "catalogo" not in st.session_state:
+if "edit_idx_catalogo" not in st.session_state:
+    st.session_state["edit_idx_catalogo"] = None
+
+def normalizar_categoria(cat_str):
+    """Padroniza e mapeia corretamente as categorias existentes"""
+    c = str(cat_str).strip().lower()
+    if any(k in c for k in ["decor", "vaso", "planta"]):
+        return "Decoração"
+    elif any(k in c for k in ["util", "utilid"]):
+        return "Utilidades"
+    elif any(k in c for k in ["acess", "chaveiro", "suporte"]):
+        return "Acessórios"
+    elif any(k in c for k in ["natal", "bola", "pinheiro", "noel"]):
+        return "Natal"
+    elif any(k in c for k in ["laç", "lac", "laco"]):
+        return "Laços"
+    else:
+        return "Outros"
+
+def carregar_catalogo():
+    """Carrega e sincroniza o catálogo diretamente do CSV"""
+    lista_carregada = []
+    
     if os.path.exists(ARQUIVO_CATALOGO):
         try:
             df_cat = pd.read_csv(ARQUIVO_CATALOGO)
-            st.session_state["catalogo"] = df_cat.to_dict("records")
+            for _, r in df_cat.iterrows():
+                cat_nome = normalizar_categoria(r.get("categoria", "Outros"))
+                lista_carregada.append({
+                    "codigo": str(r.get("codigo", "SKU-001")),
+                    "nome": str(r.get("nome", "Produto")),
+                    "categoria": cat_nome,
+                    "gramas_pla": float(r.get("gramas_pla", r.get("material", 0.0))),
+                    "horas_imp": float(r.get("horas_imp", r.get("tempo", 0.0))),
+                    "extras": str(r.get("extras", "Nenhum")),
+                    "preco_calculado": float(r.get("preco_calculado", r.get("producao", 0.0))),
+                    "foto": str(r.get("foto", r.get("imagem", "")))
+                })
+        except Exception as e:
+            st.error(f"Erro ao ler catálogo: {e}")
+
+    # Se o catálogo principal estiver vazio, tenta importar do antigo
+    if not lista_carregada and os.path.exists(ARQUIVO_ANTIGO):
+        try:
+            df_old = pd.read_csv(ARQUIVO_ANTIGO)
+            for _, r in df_old.iterrows():
+                cat_nome = normalizar_categoria(r.get("categoria", "Outros"))
+                lista_carregada.append({
+                    "codigo": str(r.get("codigo", "SKU-001")),
+                    "nome": str(r.get("nome", "Produto")),
+                    "categoria": cat_nome,
+                    "gramas_pla": float(r.get("material", 0.0)),
+                    "horas_imp": float(r.get("tempo", 0.0)),
+                    "extras": "Importado do sistema anterior",
+                    "preco_calculado": float(r.get("producao", 0.0)),
+                    "foto": str(r.get("imagem", ""))
+                })
         except:
-            st.session_state["catalogo"] = []
-    else:
-        st.session_state["catalogo"] = []
+            pass
+            
+    return lista_carregada
+
+# Inicializa o catálogo na sessão
+if "catalogo" not in st.session_state or not st.session_state["catalogo"]:
+    st.session_state["catalogo"] = carregar_catalogo()
 
 # Carrega Compras
 if "compras" not in st.session_state:
@@ -129,48 +185,70 @@ if st.session_state["pagina"] == "Início":
                 st.rerun()
 
 # ==========================================
-# 2. CATÁLOGO DE PRODUTOS & NOVO CADASTRO
+# 2. CATÁLOGO DE PRODUTOS, CADASTRO E EDIÇÃO
 # ==========================================
 elif st.session_state["pagina"] == "Catálogo":
-    st.markdown("## 📊 Catálogo de Produtos e Novos Cadastros")
+    edit_idx = st.session_state["edit_idx_catalogo"]
+    is_editing = edit_idx is not None and edit_idx < len(st.session_state["catalogo"])
+    
+    titulo_pagina = "✏️ Editar Produto no Catálogo" if is_editing else "📊 Catálogo de Produtos e Novos Cadastros"
+    st.markdown(f"## {titulo_pagina}")
     st.markdown("---")
     
-    if st.button("⬅️ Voltar para a Página Inicial"):
-        st.session_state["pagina"] = "Início"
-        st.rerun()
+    col_vol, col_rec = st.columns([4, 1])
+    with col_vol:
+        if st.button("⬅️ Voltar para a Página Inicial"):
+            st.session_state["pagina"] = "Início"
+            st.session_state["edit_idx_catalogo"] = None
+            st.rerun()
+    with col_rec:
+        if st.button("🔄 Atualizar Catálogo"):
+            st.session_state["catalogo"] = carregar_catalogo()
+            st.success("Catálogo recarregado com sucesso!")
+            st.rerun()
         
-    st.markdown("### ➕ Cadastrar Novo Produto no Catálogo")
+    produto_em_edicao = st.session_state["catalogo"][edit_idx] if is_editing else {}
+
+    form_titulo = "✏️ Alterar Dados do Produto" if is_editing else "➕ Cadastrar Novo Produto no Catálogo"
+    st.markdown(f"### {form_titulo}")
     
-    with st.form("form_novo_produto_catalogo"):
+    with st.form("form_catalogo_crud"):
         col_cad1, col_cad2 = st.columns(2)
         
         with col_cad1:
-            nome_prod = st.text_input("Nome do Produto", placeholder="Ex: Chaveiro Personalizado")
-            categoria_prod = st.selectbox("Categoria", categorias_produtos_lista)
+            nome_prod = st.text_input("Nome do Produto", value=produto_em_edicao.get("nome", ""), placeholder="Ex: Chaveiro Personalizado")
             
-            # Geração automática de código baseada na categoria
-            prefixo = categoria_prod[:3].upper()
-            prods_mesma_cat = [p for p in st.session_state["catalogo"] if str(p.get("categoria")) == categoria_prod]
-            proximo_num = len(prods_mesma_cat) + 1
-            codigo_automatico = f"{prefixo}-{proximo_num:03d}"
+            cat_atual = produto_em_edicao.get("categoria", categorias_produtos_lista[0])
+            cat_idx = categorias_produtos_lista.index(cat_atual) if cat_atual in categorias_produtos_lista else 0
+            categoria_prod = st.selectbox("Categoria", categorias_produtos_lista, index=cat_idx)
             
-            st.text_input("Código Automático", value=codigo_automatico, disabled=True)
+            if is_editing:
+                codigo_automatico = produto_em_edicao.get("codigo", "SKU-001")
+            else:
+                prefixo = categoria_prod[:3].upper()
+                prods_mesma_cat = [p for p in st.session_state["catalogo"] if str(p.get("categoria")).strip() == categoria_prod]
+                proximo_num = len(prods_mesma_cat) + 1
+                codigo_automatico = f"{prefixo}-{proximo_num:03d}"
             
-            gramas_pla = st.number_input("Gramas de PLA utilizadas", min_value=0.0, value=30.0, step=1.0)
-            horas_imp = st.number_input("Horas de Impressão", min_value=0.0, value=2.0, step=0.5)
+            st.text_input("Código do Produto", value=codigo_automatico, disabled=True)
+            
+            gramas_pla = st.number_input("Gramas de PLA utilizadas", min_value=0.0, value=float(produto_em_edicao.get("gramas_pla", 30.0)), step=1.0)
+            horas_imp = st.number_input("Horas de Impressão", min_value=0.0, value=float(produto_em_edicao.get("horas_imp", 2.0)), step=0.5)
 
         with col_cad2:
             st.markdown("##### 🔌 Extras / Componentes Opcionais")
-            usa_nfc = st.checkbox("Tag NFC")
-            desc_nfc = st.text_input("Detalhe Tag NFC", placeholder="Ex: NTAG216") if usa_nfc else ""
+            extras_atuais = produto_em_edicao.get("extras", "")
+            
+            usa_nfc = st.checkbox("Tag NFC", value="NFC:" in extras_atuais)
+            desc_nfc = st.text_input("Detalhe Tag NFC", value="NTAG216" if usa_nfc else "") if usa_nfc else ""
             custo_nfc = st.number_input("Custo NFC (€)", min_value=0.0, value=0.30) if usa_nfc else 0.0
 
-            usa_argola = st.checkbox("Argola")
-            desc_argola = st.text_input("Detalhe Argola", placeholder="Ex: 12mm níquel") if usa_argola else ""
+            usa_argola = st.checkbox("Argola", value="Argola:" in extras_atuais)
+            desc_argola = st.text_input("Detalhe Argola", value="12mm" if usa_argola else "") if usa_argola else ""
             custo_argola = st.number_input("Custo Argola (€)", min_value=0.0, value=0.10) if usa_argola else 0.0
 
-            usa_outros = st.checkbox("Outros Extras")
-            desc_outros = st.text_input("Descrição de Outros", placeholder="Ex: Embalagem especial") if usa_outros else ""
+            usa_outros = st.checkbox("Outros Extras", value="Outros:" in extras_atuais)
+            desc_outros = st.text_input("Descrição de Outros", value="" if not usa_outros else "Extra") if usa_outros else ""
             custo_outros = st.number_input("Custo Outros (€)", min_value=0.0, value=0.0) if usa_outros else 0.0
 
             margem_lucro = st.number_input("Margem de Lucro Desejada (%)", min_value=0.0, value=100.0, step=10.0)
@@ -178,11 +256,12 @@ elif st.session_state["pagina"] == "Catálogo":
             st.markdown("##### 📸 Foto do Produto")
             foto_upload = st.file_uploader("Fazer Upload da Imagem", type=["jpg", "jpeg", "png"])
 
-        if st.form_submit_button("Salvar Novo Produto no Catálogo"):
+        botao_texto = "Salvar Alterações" if is_editing else "Salvar Novo Produto no Catálogo"
+        if st.form_submit_button(botao_texto):
             if not nome_prod:
                 st.error("Por favor, preencha o Nome do Produto.")
             else:
-                caminho_foto = ""
+                caminho_foto = produto_em_edicao.get("foto", "")
                 if foto_upload is not None:
                     ext = foto_upload.name.split(".")[-1]
                     caminho_foto = os.path.join(PASTA_IMAGENS, f"{codigo_automatico}.{ext}")
@@ -205,10 +284,22 @@ elif st.session_state["pagina"] == "Catálogo":
                     "foto": caminho_foto
                 }
 
-                st.session_state["catalogo"].append(novo_item)
+                if is_editing:
+                    st.session_state["catalogo"][edit_idx] = novo_item
+                    st.session_state["edit_idx_catalogo"] = None
+                    msg = f"Produto '{nome_prod}' atualizado com sucesso!"
+                else:
+                    st.session_state["catalogo"].append(novo_item)
+                    msg = f"Produto '{nome_prod}' cadastrado com sucesso no catálogo!"
+
                 salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
-                st.success(f"Produto '{nome_prod}' cadastrado com sucesso no catálogo!")
+                st.success(msg)
                 st.rerun()
+
+    if is_editing:
+        if st.button("❌ Cancelar Edição"):
+            st.session_state["edit_idx_catalogo"] = None
+            st.rerun()
 
     st.markdown("---")
     st.markdown("### 📂 Produtos Cadastrados por Categoria")
@@ -235,11 +326,18 @@ elif st.session_state["pagina"] == "Catálogo":
                             else:
                                 st.caption("Sem foto")
                         
-                        if st.button("🗑️ Excluir Produto", key=f"del_cat_{cat}_{idx}"):
-                            st.session_state["catalogo"].remove(prod)
-                            salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
-                            st.success("Produto removido!")
-                            st.rerun()
+                        col_b1, col_b2 = st.columns(2)
+                        with col_b1:
+                            real_idx = st.session_state["catalogo"].index(prod)
+                            if st.button("✏️ Editar", key=f"edit_btn_{real_idx}"):
+                                st.session_state["edit_idx_catalogo"] = real_idx
+                                st.rerun()
+                        with col_b2:
+                            if st.button("🗑️ Excluir", key=f"del_btn_{real_idx}"):
+                                st.session_state["catalogo"].remove(prod)
+                                salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
+                                st.success("Produto removido!")
+                                st.rerun()
                         st.markdown("---")
 
 # ==========================================
@@ -317,114 +415,3 @@ elif st.session_state["pagina"] == "Compras":
         with col_c1:
             material = st.selectbox("Material", ["PLA", "Argolas", "NFC", "OUTROS"])
             data_compra = st.date_input("Data da Compra", value=date.today())
-            variedade = st.text_input("Variedade (Cor / Modelo / Marca)", placeholder="Ex: Azul Seda, 12mm, NTAG216")
-            
-        with col_c2:
-            col_q1, col_q2 = st.columns(2)
-            with col_q1:
-                qtd = st.number_input("Quantidade", min_value=0.01, value=1.0, step=1.0)
-            with col_q2:
-                unidade_medida = st.selectbox("Unidade", ["KG", "Unidades", "Gramas", "Metros"])
-                
-            valor_compra = st.number_input("Valor da Compra (€)", min_value=0.0, value=20.0, step=1.0)
-            identificacao_nota = st.text_input("Identificação da Nota (NF / Fatura)", placeholder="Ex: NF-12345")
-            
-        if st.form_submit_button("Salvar Compra"):
-            nova_compra = {
-                "material": material,
-                "data_compra": str(data_compra),
-                "variedade": variedade,
-                "quantidade": qtd,
-                "unidade": unidade_medida,
-                "valor_compra": valor_compra,
-                "identificacao_nota": identificacao_nota
-            }
-            st.session_state["compras"].append(nova_compra)
-            salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])
-            st.success("Compra cadastrada com sucesso!")
-            st.rerun()
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("📋 Ver / Ocultar Compras Salvas"):
-        st.session_state["mostrar_tabela_compras"] = not st.session_state["mostrar_tabela_compras"]
-
-    if st.session_state["mostrar_tabela_compras"]:
-        st.markdown("### 📦 Histórico de Compras")
-        if not st.session_state["compras"]:
-            st.info("Nenhuma compra registrada.")
-        else:
-            st.dataframe(pd.DataFrame(st.session_state["compras"]), use_container_width=True)
-            if st.button("🗑️ Apagar Última Compra"):
-                st.session_state["compras"].pop()
-                salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])
-                st.success("Removido!")
-                st.rerun()
-
-# ==========================================
-# 5. PRODUÇÃO
-# ==========================================
-elif st.session_state["pagina"] == "Produção":
-    st.markdown("## ⚙️ Registro de Produção de Lotes")
-    st.markdown("---")
-    
-    if st.button("⬅️ Voltar para a Página Inicial"):
-        st.session_state["pagina"] = "Início"
-        st.rerun()
-        
-    if not st.session_state["catalogo"]:
-        st.warning("⚠️ Cadastre produtos no Catálogo primeiro para poder registrar lotes de produção.")
-    else:
-        nomes_produtos = [p["nome"] for p in st.session_state["catalogo"]]
-        produto_escolhido = st.selectbox("Selecione o Produto do Catálogo", nomes_produtos)
-        
-        prod_atual = next((p for p in st.session_state["catalogo"] if p["nome"] == produto_escolhido), {})
-        
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-            codigo_prod = prod_atual.get("codigo", "SKU-000")
-            st.text_input("Código", value=codigo_prod, disabled=True)
-            categoria_prod = prod_atual.get("categoria", "Outros")
-            st.text_input("Categoria", value=categoria_prod, disabled=True)
-            quantidade_lote = st.number_input("Quantidade no Lote", min_value=1, value=1, step=1)
-            data_producao = st.date_input("Data da Produção", value=date.today())
-            
-        with col_p2:
-            preco_unit = float(prod_atual.get("preco_calculado", 0.0))
-            st.metric(label="Preço Unitário Calculado", value=f"€ {preco_unit:.2f}")
-            st.metric(label="Valor Total do Lote", value=f"€ {preco_unit * quantidade_lote:.2f}")
-            
-            foto_p = str(prod_atual.get("foto", ""))
-            if foto_p and os.path.exists(foto_p):
-                st.image(foto_p, width=150, caption=produto_escolhido)
-            else:
-                st.caption("Sem foto.")
-                
-        if st.button("💾 Salvar Lote Produzido"):
-            nova_prod = {
-                "codigo": codigo_prod,
-                "nome_produto": produto_escolhido,
-                "categoria": categoria_prod,
-                "quantidade": quantidade_lote,
-                "data_producao": str(data_producao),
-                "valor_total_lote": round(preco_unit * quantidade_lote, 2)
-            }
-            st.session_state["producao"].append(nova_prod)
-            salvar_dados(ARQUIVO_PRODUCAO, st.session_state["producao"])
-            st.success("Produção registrada com sucesso!")
-            st.rerun()
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("📋 Ver / Ocultar Histórico de Produção"):
-        st.session_state["mostrar_tabela_producao"] = not st.session_state["mostrar_tabela_producao"]
-
-    if st.session_state["mostrar_tabela_producao"]:
-        st.markdown("### 📦 Lotes Produzidos")
-        if not st.session_state["producao"]:
-            st.info("Nenhum lote registrado.")
-        else:
-            st.dataframe(pd.DataFrame(st.session_state["producao"]), use_container_width=True)
-            if st.button("🗑️ Apagar Último Registro"):
-                st.session_state["producao"].pop()
-                salvar_dados(ARQUIVO_PRODUCAO, st.session_state["producao"])
-                st.success("Removido!")
-                st.rerun()

@@ -230,16 +230,29 @@ elif st.session_state["pagina"] == "Catálogo":
     st.markdown(f"## {titulo_pagina}")
     st.markdown("---")
     
-    col_vol, col_rec = st.columns([4, 1])
+    col_vol, col_rec, col_org = st.columns([3, 1, 1])
     with col_vol:
         if st.button("⬅️ Voltar para a Página Inicial"):
             st.session_state["pagina"] = "Início"
             st.session_state["edit_idx_catalogo"] = None
             st.rerun()
     with col_rec:
-        if st.button("🔄 Atualizar Catálogo"):
+        if st.button("🔄 Atualizar"):
             st.session_state["catalogo"] = carregar_catalogo()
-            st.success("Catálogo recarregado!")
+            st.success("Recarregado!")
+            st.rerun()
+    with col_org:
+        if st.button("🔢 Reorganizar Códigos"):
+            # Rotina para reenumerar sequencialmente por categoria
+            contadores = {cat: 1 for cat in categorias_produtos_lista}
+            for prod in st.session_state["catalogo"]:
+                cat = normalizar_categoria(prod.get("categoria", "Outros"))
+                prod["categoria"] = cat
+                pref = obter_prefixo_categoria(cat)
+                prod["codigo"] = f"{pref}-{contadores[cat]:03d}"
+                contadores[cat] += 1
+            salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
+            st.success("Códigos reorganizados com sucesso!")
             st.rerun()
         
     produto_em_edicao = st.session_state["catalogo"][edit_idx] if is_editing else {}

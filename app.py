@@ -14,8 +14,8 @@ ARQUIVO_PRODUCAO = "producao_lotes.csv"
 
 os.makedirs(PASTA_IMAGENS, exist_ok=True)
 
-# Categorias oficiais fixas
-categorias_produtos_lista = ["Decoração", "Utilidades", "Acessórios", "Natal", "Laços", "Outros"]
+# Categorias oficiais fixas (sem "Outros" na listagem ativa, se preferir focar nas principais)
+categorias_produtos_lista = ["Decoração", "Utilidades", "Acessórios", "Natal", "Laços"]
 
 def obter_prefixo_categoria(cat_str):
     c = str(cat_str).strip().lower()
@@ -24,30 +24,16 @@ def obter_prefixo_categoria(cat_str):
     elif "acess" in c: return "ACE"
     elif "natal" in c: return "NAT"
     elif "laç" in c or "lac" in c or "cha" in c: return "LAC"
-    else: return "OUT"
+    else: return "DEC"
 
 def normalizar_categoria(cat_str):
     c = str(cat_str).strip().lower()
-    if not c or c == "nan": return "Outros"
-    
     if any(k in c for k in ["decor", "vaso", "planta", "decora"]): return "Decoração"
     elif any(k in c for k in ["util", "utilid"]): return "Utilidades"
     elif any(k in c for k in ["acess", "suporte"]): return "Acessórios"
     elif any(k in c for k in ["natal", "bola", "pinheiro", "noel", "vela"]): return "Natal"
     elif any(k in c for k in ["laç", "lac", "laco", "chaveiro", "cha"]): return "Laços"
-    elif any(k in c for k in ["out"]): return "Outros"
-    
-    import unicodedata
-    def remover_acentos(texto):
-        nfkd = unicodedata.normalize('NFKD', texto)
-        return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
-    
-    c_limpo = remover_acentos(c)
-    for oficial in categorias_produtos_lista:
-        if remover_acentos(oficial) in c_limpo or c_limpo in remover_acentos(oficial):
-            return oficial
-            
-    return "Outros"
+    return "Decoração"
 
 # ==========================================
 # GERENCIAMENTO DE ESTADO E CARREGAMENTO
@@ -72,19 +58,16 @@ def carregar_catalogo():
             df_cat.columns = [str(c).strip().lower() for c in df_cat.columns]
             
             for _, r in df_cat.iterrows():
-                cat_raw = str(r.get("categoria", r.get("category", "Outros")))
+                cat_raw = str(r.get("categoria", "Decoração"))
                 cat_nome = normalizar_categoria(cat_raw)
                 
-                codigo = str(r.get("codigo", r.get("sku", "")))
+                codigo = str(r.get("codigo", ""))
                 if not codigo or codigo == "nan" or "-" not in codigo:
                     codigo = f"{obter_prefixo_categoria(cat_nome)}-001"
 
-                # Mapeia as colunas exatas vistas no seu CSV (material = gramas, tempo = horas)
-                g_pla = float(r.get("material", r.get("gramas_pla", r.get("gramas", 0.0))))
-                h_imp = float(r.get("tempo", r.get("horas_imp", r.get("horas", 0.0))))
-                p_calc = float(r.get("producao", r.get("preco_calculado", r.get("preco", 0.0))))
-                
-                # Lê a coluna imagem/foto do CSV
+                g_pla = float(r.get("material", r.get("gramas_pla", 0.0)))
+                h_imp = float(r.get("tempo", r.get("horas_imp", 0.0)))
+                p_calc = float(r.get("venda", r.get("producao", 0.0)))
                 foto_path = str(r.get("imagem", r.get("foto", "")))
                 if foto_path == "nan": foto_path = ""
 
@@ -117,21 +100,31 @@ if "producao" not in st.session_state:
         except: st.session_state["producao"] = []
     else: st.session_state["producao"] = []
 
-def salvar_dados(caminho, dados):
+def salvar_dados_catalogo(dados):
     try:
-        df = pd.DataFrame(dados)
-        df.to_csv(caminho, index=False)
+        dados_para_salvar = []
+        for p in dados:
+            dados_para_salvar.append({
+                "codigo": p.get("codigo"),
+                "nome": p.get("nome"),
+                "categoria": p.get("categoria"),
+                "tempo": p.get("horas_imp"),
+                "material": p.get("gramas_pla"),
+                "producao": p.get("preco_calculado") / 2.0,
+                "margem": 100.0,
+                "venda": p.get("preco_calculado"),
+                "lucro": p.get("preco_calculado") / 2.0,
+                "imagem": p.get("foto"),
+                "gastos_extras": 0.0
+            })
+        df = pd.DataFrame(dados_para_salvar)
+        df.to_csv(ARQUIVO_CATALOGO, index=False)
     except Exception as e:
-        st.error(f"Erro ao salvar arquivo {caminho}: {e}")
+        st.error(f"Erro ao salvar catálogo: {e}")
 
-# Garante a criação inicial dos arquivos CSV se não existirem
-for arquivo, colunas in [
-    (ARQUIVO_CATALOGO, ["codigo", "nome", "categoria", "tempo", "material", "producao", "margem", "venda", "lucro", "imagem", "gastos_extras"]),
-    (ARQUIVO_COMPRAS, ["material", "data_compra", "variedade", "quantidade", "unidade", "valor_compra", "identificacao_nota"]),
-    (ARQUIVO_PRODUCAO, ["codigo", "nome_produto", "categoria", "quantidade", "data_producao", "valor_total_lote"])
-]:
-    if not os.path.exists(arquivo):
-        pd.DataFrame(columns=colunas).to_csv(arquivo, index=False)
+# Garante arquivos iniciais
+if not os.path.exists(ARQUIVO_CATALOGO):
+    pd.DataFrame(columns=["codigo", "nome", "categoria", "tempo", "material", "producao", "margem", "venda", "lucro", "imagem", "gastos_extras"]).to_csv(ARQUIVO_CATALOGO, index=False)
 
 # ==========================================
 # MENU LATERAL & CUSTOS BASE GLOBAIS
@@ -152,20 +145,6 @@ st.session_state["global_custo_h_imp"] = st.sidebar.number_input("Custo Hora Imp
 
 custo_g_pla_global = st.session_state["global_preco_kg_pla"] / 1000.0
 custo_h_imp_global = st.session_state["global_custo_h_imp"]
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📥 Downloads de Arquivos")
-
-def botao_download(nome_arquivo, label):
-    if os.path.exists(nome_arquivo):
-        with open(nome_arquivo, "rb") as f:
-            st.sidebar.download_button(label=label, data=f, file_name=nome_arquivo, mime="text/csv")
-    else:
-        st.sidebar.caption(f"{nome_arquivo} não encontrado.")
-
-botao_download(ARQUIVO_CATALOGO, "📥 Baixar Catálogo (CSV)")
-botao_download(ARQUIVO_COMPRAS, "📥 Baixar Compras (CSV)")
-botao_download(ARQUIVO_PRODUCAO, "📥 Baixar Produção (CSV)")
 
 # ==========================================
 # 1. PÁGINA INICIAL (HOME)
@@ -206,16 +185,18 @@ elif st.session_state["pagina"] == "Catálogo":
     st.markdown(f"## {titulo_pagina}")
     st.markdown("---")
     
-    col_vol, col_rec = st.columns([4, 1])
+    col_vol, col_limpar = st.columns([3, 1])
     with col_vol:
         if st.button("⬅️ Voltar para a Página Inicial"):
             st.session_state["pagina"] = "Início"
             st.session_state["edit_idx_catalogo"] = None
             st.rerun()
-    with col_rec:
-        if st.button("🔄 Atualizar"):
-            st.session_state["catalogo"] = carregar_catalogo()
-            st.success("Recarregado!")
+    with col_limpar:
+        if st.button("🗑️ Limpar Todo o Catálogo", type="secondary"):
+            st.session_state["catalogo"] = []
+            if os.path.exists(ARQUIVO_CATALOGO):
+                os.remove(ARQUIVO_CATALOGO)
+            st.success("Catálogo limpo com sucesso! Pode recadastrar.")
             st.rerun()
         
     produto_em_edicao = st.session_state["catalogo"][edit_idx] if is_editing else {}
@@ -314,23 +295,7 @@ elif st.session_state["pagina"] == "Catálogo":
                 st.session_state["catalogo"].append(novo_item)
                 msg = f"Produto '{nome_prod}' cadastrado com sucesso no catálogo!"
 
-            # Salva mantendo compatibilidade com as colunas do CSV original
-            dados_para_salvar = []
-            for p in st.session_state["catalogo"]:
-                dados_para_salvar.append({
-                    "codigo": p.get("codigo"),
-                    "nome": p.get("nome"),
-                    "categoria": p.get("categoria"),
-                    "tempo": p.get("horas_imp"),
-                    "material": p.get("gramas_pla"),
-                    "producao": p.get("preco_calculado") / 2.0,
-                    "margem": 100.0,
-                    "venda": p.get("preco_calculado"),
-                    "lucro": p.get("preco_calculado") / 2.0,
-                    "imagem": p.get("foto"),
-                    "gastos_extras": 0.0
-                })
-            salvar_dados(ARQUIVO_CATALOGO, dados_para_salvar)
+            salvar_dados_catalogo(st.session_state["catalogo"])
             st.success(msg)
             st.rerun()
 
@@ -343,7 +308,7 @@ elif st.session_state["pagina"] == "Catálogo":
     st.markdown("### 📂 Produtos Cadastrados por Categoria")
     
     if not st.session_state["catalogo"]:
-        st.info("Nenhum produto cadastrado no catálogo ainda.")
+        st.info("Nenhum produto cadastrado no catálogo ainda. Use o formulário acima para comecar.")
     else:
         for cat in categorias_produtos_lista:
             prods_filtrados = [p for p in st.session_state["catalogo"] if normalizar_categoria(p.get("categoria")) == cat]
@@ -363,8 +328,6 @@ elif st.session_state["pagina"] == "Catálogo":
                             import re
                             valores_extras = re.findall(r"€([0-9.]+)", extras_str)
                             extra_val = sum([float(v) for v in valores_extras])
-                        elif "NFC" in extras_str or "Argola" in extras_str:
-                            extra_val = 0.40
                         
                         custo_total_prod = c_pla_val + c_hora_val + extra_val
                         preco_venda_atual = custo_total_prod * 2.0
@@ -393,23 +356,7 @@ elif st.session_state["pagina"] == "Catálogo":
                         with col_b2:
                             if st.button("🗑️ Excluir", key=f"del_cat_{cat}_{i}"):
                                 st.session_state["catalogo"].remove(prod)
-                                
-                                dados_para_salvar = []
-                                for p in st.session_state["catalogo"]:
-                                    dados_para_salvar.append({
-                                        "codigo": p.get("codigo"),
-                                        "nome": p.get("nome"),
-                                        "categoria": p.get("categoria"),
-                                        "tempo": p.get("horas_imp"),
-                                        "material": p.get("gramas_pla"),
-                                        "producao": p.get("preco_calculado") / 2.0,
-                                        "margem": 100.0,
-                                        "venda": p.get("preco_calculado"),
-                                        "lucro": p.get("preco_calculado") / 2.0,
-                                        "imagem": p.get("foto"),
-                                        "gastos_extras": 0.0
-                                    })
-                                salvar_dados(ARQUIVO_CATALOGO, dados_para_salvar)
+                                salvar_dados_catalogo(st.session_state["catalogo"])
                                 st.success("Produto removido!")
                                 st.rerun()
                         st.markdown("---")
@@ -500,7 +447,7 @@ elif st.session_state["pagina"] == "Compras":
                 "identificacao_nota": identificacao_nota
             }
             st.session_state["compras"].append(nova_compra)
-            salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])
+            pd.DataFrame(st.session_state["compras"]).to_csv(ARQUIVO_COMPRAS, index=False)
             st.success("Compra cadastrada com sucesso!")
             st.rerun()
 
@@ -516,7 +463,7 @@ elif st.session_state["pagina"] == "Compras":
             st.dataframe(pd.DataFrame(st.session_state["compras"]), use_container_width=True)
             if st.button("🗑️ Apagar Última Compra"):
                 st.session_state["compras"].pop()
-                salvar_dados(ARQUIVO_COMPRAS, st.session_state["compras"])
+                pd.DataFrame(st.session_state["compras"]).to_csv(ARQUIVO_COMPRAS, index=False)
                 st.success("Removido!")
                 st.rerun()
 
@@ -547,7 +494,7 @@ elif st.session_state["pagina"] == "Produção":
         with col_p1:
             codigo_prod = prod_atual.get("codigo", "SKU-000")
             st.text_input("Código", value=codigo_prod, disabled=True)
-            categoria_prod = prod_atual.get("categoria", "Outros")
+            categoria_prod = prod_atual.get("categoria", "Decoração")
             st.text_input("Categoria", value=categoria_prod, disabled=True)
             quantidade_lote = st.number_input("Quantidade no Lote", min_value=1, value=1, step=1)
             data_producao = st.date_input("Data da Produção", value=date.today())
@@ -572,7 +519,7 @@ elif st.session_state["pagina"] == "Produção":
                 "valor_total_lote": round(preco_unit * quantidade_lote, 2)
             }
             st.session_state["producao"].append(nova_prod)
-            salvar_dados(ARQUIVO_PRODUCAO, st.session_state["producao"])
+            pd.DataFrame(st.session_state["producao"]).to_csv(ARQUIVO_PRODUCAO, index=False)
             st.success("Produção registrada com sucesso!")
             st.rerun()
 
@@ -588,6 +535,6 @@ elif st.session_state["pagina"] == "Produção":
             st.dataframe(pd.DataFrame(st.session_state["producao"]), use_container_width=True)
             if st.button("🗑️ Apagar Último Registro"):
                 st.session_state["producao"].pop()
-                salvar_dados(ARQUIVO_PRODUCAO, st.session_state["producao"])
+                pd.DataFrame(st.session_state["producao"]).to_csv(ARQUIVO_PRODUCAO, index=False)
                 st.success("Removido!")
                 st.rerun()

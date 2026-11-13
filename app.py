@@ -35,7 +35,6 @@ def normalizar_categoria(cat_str):
     elif any(k in c for k in ["laç", "lac", "laco", "laços", "chaveiro", "cha"]): return "Laços"
     elif any(k in c for k in ["out", "outros"]): return "Outros"
     
-    # Se bater com a lista oficial exata
     for oficial in categorias_produtos_lista:
         if oficial.lower() == c:
             return oficial
@@ -62,23 +61,35 @@ def carregar_catalogo():
     if os.path.exists(ARQUIVO_CATALOGO):
         try:
             df_cat = pd.read_csv(ARQUIVO_CATALOGO)
+            # Normaliza os nomes das colunas do CSV para minúsculas (evita conflitos de maiúsculas)
+            df_cat.columns = [str(c).strip().lower() for c in df_cat.columns]
+            
             for _, r in df_cat.iterrows():
-                cat_raw = str(r.get("categoria", "Outros"))
+                cat_raw = str(r.get("categoria", r.get("category", "Outros")))
+                if cat_raw == "nan" or not cat_raw.strip():
+                    cat_raw = "Outros"
                 cat_nome = normalizar_categoria(cat_raw)
                 
-                codigo = str(r.get("codigo", ""))
+                codigo = str(r.get("codigo", r.get("sku", "")))
                 if not codigo or codigo == "nan" or "-" not in codigo:
                     codigo = f"{obter_prefixo_categoria(cat_nome)}-001"
+
+                # Lê os campos aceitando diferentes nomes legados nas colunas
+                g_pla = float(r.get("gramas_pla", r.get("material", r.get("gramas", 0.0))))
+                h_imp = float(r.get("horas_imp", r.get("tempo", r.get("horas", 0.0))))
+                p_calc = float(r.get("preco_calculado", r.get("producao", r.get("preco", 0.0))))
+                foto_path = str(r.get("foto", r.get("imagem", "")))
+                if foto_path == "nan": foto_path = ""
 
                 lista_carregada.append({
                     "codigo": codigo,
                     "nome": str(r.get("nome", "Produto")),
                     "categoria": cat_nome,
-                    "gramas_pla": float(r.get("gramas_pla", 0.0)),
-                    "horas_imp": float(r.get("horas_imp", 0.0)),
+                    "gramas_pla": g_pla,
+                    "horas_imp": h_imp,
                     "extras": str(r.get("extras", "Nenhum")),
-                    "preco_calculado": float(r.get("preco_calculado", 0.0)),
-                    "foto": str(r.get("foto", ""))
+                    "preco_calculado": p_calc,
+                    "foto": foto_path
                 })
         except Exception as e:
             st.error(f"Erro ao carregar catálogo: {e}")

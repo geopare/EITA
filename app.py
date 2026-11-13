@@ -337,7 +337,7 @@ elif st.session_state["pagina"] == "Catálogo":
             
             if prods_filtrados:
                 with st.expander(f"📁 **{cat}** ({len(prods_filtrados)} produtos)"):
-                    for prod in prods_filtrados:
+                    for i, prod in enumerate(prods_filtrados):
                         g_prod = float(prod.get("gramas_pla", 0.0))
                         h_prod = float(prod.get("horas_imp", 0.0))
                         
@@ -374,11 +374,11 @@ elif st.session_state["pagina"] == "Catálogo":
                         
                         col_b1, col_b2 = st.columns(2)
                         with col_b1:
-                            if st.button("✏️ Editar", key=f"edit_idx_{real_idx}"):
+                            if st.button("✏️ Editar", key=f"edit_cat_{cat}_{i}"):
                                 st.session_state["edit_idx_catalogo"] = real_idx
                                 st.rerun()
                         with col_b2:
-                            if st.button("🗑️ Excluir", key=f"del_idx_{real_idx}"):
+                            if st.button("🗑️ Excluir", key=f"del_cat_{cat}_{i}"):
                                 st.session_state["catalogo"].remove(prod)
                                 salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
                                 st.success("Produto removido!")

@@ -61,7 +61,6 @@ def carregar_catalogo():
     if os.path.exists(ARQUIVO_CATALOGO):
         try:
             df_cat = pd.read_csv(ARQUIVO_CATALOGO)
-            # Normaliza os nomes das colunas do CSV para minúsculas (evita conflitos de maiúsculas)
             df_cat.columns = [str(c).strip().lower() for c in df_cat.columns]
             
             for _, r in df_cat.iterrows():
@@ -74,7 +73,6 @@ def carregar_catalogo():
                 if not codigo or codigo == "nan" or "-" not in codigo:
                     codigo = f"{obter_prefixo_categoria(cat_nome)}-001"
 
-                # Lê os campos aceitando diferentes nomes legados nas colunas
                 g_pla = float(r.get("gramas_pla", r.get("material", r.get("gramas", 0.0))))
                 h_imp = float(r.get("horas_imp", r.get("tempo", r.get("horas", 0.0))))
                 p_calc = float(r.get("preco_calculado", r.get("producao", r.get("preco", 0.0))))
@@ -375,11 +373,14 @@ elif st.session_state["pagina"] == "Catálogo":
                         col_b1, col_b2 = st.columns(2)
                         with col_b1:
                             real_idx = st.session_state["catalogo"].index(prod)
-                            if st.button("✏️ Editar", key=f"edit_btn_{real_idx}"):
+                            # Chave única garantida utilizando o código do produto e o índice absoluto
+                            codigo_unico_chave = f"{prod.get('codigo')}_{real_idx}"
+                            if st.button("✏️ Editar", key=f"edit_btn_{codigo_unico_chave}"):
                                 st.session_state["edit_idx_catalogo"] = real_idx
                                 st.rerun()
                         with col_b2:
-                            if st.button("🗑️ Excluir", key=f"del_btn_{real_idx}"):
+                            codigo_unico_chave = f"{prod.get('codigo')}_{real_idx}"
+                            if st.button("🗑️ Excluir", key=f"del_btn_{codigo_unico_chave}"):
                                 st.session_state["catalogo"].remove(prod)
                                 salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
                                 st.success("Produto removido!")

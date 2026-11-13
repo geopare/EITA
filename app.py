@@ -370,17 +370,15 @@ elif st.session_state["pagina"] == "Catálogo":
                             else:
                                 st.caption("Sem foto")
                         
+                        real_idx = st.session_state["catalogo"].index(prod)
+                        
                         col_b1, col_b2 = st.columns(2)
                         with col_b1:
-                            real_idx = st.session_state["catalogo"].index(prod)
-                            # Chave única garantida utilizando o código do produto e o índice absoluto
-                            codigo_unico_chave = f"{prod.get('codigo')}_{real_idx}"
-                            if st.button("✏️ Editar", key=f"edit_btn_{codigo_unico_chave}"):
+                            if st.button("✏️ Editar", key=f"edit_btn_idx_{real_idx}"):
                                 st.session_state["edit_idx_catalogo"] = real_idx
                                 st.rerun()
                         with col_b2:
-                            codigo_unico_chave = f"{prod.get('codigo')}_{real_idx}"
-                            if st.button("🗑️ Excluir", key=f"del_btn_{codigo_unico_chave}"):
+                            if st.button("🗑️ Excluir", key=f"del_btn_idx_{real_idx}"):
                                 st.session_state["catalogo"].remove(prod)
                                 salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
                                 st.success("Produto removido!")

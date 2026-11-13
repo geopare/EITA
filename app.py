@@ -52,9 +52,10 @@ if "edit_idx_catalogo" not in st.session_state:
 
 def carregar_catalogo():
     lista_carregada = []
-    if os.path.exists(ARQUIVO_CATALOGO):
+    caminho_abs = os.path.abspath(ARQUIVO_CATALOGO)
+    if os.path.exists(caminho_abs):
         try:
-            df_cat = pd.read_csv(ARQUIVO_CATALOGO)
+            df_cat = pd.read_csv(caminho_abs)
             df_cat.columns = [str(c).strip().lower() for c in df_cat.columns]
             
             for _, r in df_cat.iterrows():
@@ -89,14 +90,16 @@ if "catalogo" not in st.session_state or not st.session_state["catalogo"]:
     st.session_state["catalogo"] = carregar_catalogo()
 
 if "compras" not in st.session_state:
-    if os.path.exists(ARQUIVO_COMPRAS):
-        try: st.session_state["compras"] = pd.read_csv(ARQUIVO_COMPRAS).to_dict("records")
+    caminho_c = os.path.abspath(ARQUIVO_COMPRAS)
+    if os.path.exists(caminho_c):
+        try: st.session_state["compras"] = pd.read_csv(caminho_c).to_dict("records")
         except: st.session_state["compras"] = []
     else: st.session_state["compras"] = []
 
 if "producao" not in st.session_state:
-    if os.path.exists(ARQUIVO_PRODUCAO):
-        try: st.session_state["producao"] = pd.read_csv(ARQUIVO_PRODUCAO).to_dict("records")
+    caminho_p = os.path.abspath(ARQUIVO_PRODUCAO)
+    if os.path.exists(caminho_p):
+        try: st.session_state["producao"] = pd.read_csv(caminho_p).to_dict("records")
         except: st.session_state["producao"] = []
     else: st.session_state["producao"] = []
 
@@ -119,13 +122,16 @@ def salvar_dados_catalogo(dados):
                 "gastos_extras": 0.0
             })
         df = pd.DataFrame(dados_para_salvar)
-        df.to_csv(ARQUIVO_CATALOGO, index=False)
+        caminho_abs = os.path.abspath(ARQUIVO_CATALOGO)
+        df.to_csv(caminho_abs, index=False)
+        st.success(f"Catálogo guardado com sucesso!")
     except Exception as e:
-        st.error(f"Erro ao salvar catálogo: {e}")
+        st.error(f"Erro crítico ao salvar o catálogo: {e}")
 
 # Garante arquivos iniciais
-if not os.path.exists(ARQUIVO_CATALOGO):
-    pd.DataFrame(columns=["codigo", "nome", "categoria", "tempo", "material", "producao", "margem", "venda", "lucro", "imagem", "gastos_extras"]).to_csv(ARQUIVO_CATALOGO, index=False)
+caminho_inicial_cat = os.path.abspath(ARQUIVO_CATALOGO)
+if not os.path.exists(caminho_inicial_cat):
+    pd.DataFrame(columns=["codigo", "nome", "categoria", "tempo", "material", "producao", "margem", "venda", "lucro", "imagem", "gastos_extras"]).to_csv(caminho_inicial_cat, index=False)
 
 # ==========================================
 # MENU LATERAL & CUSTOS BASE GLOBAIS
@@ -149,8 +155,9 @@ custo_h_imp_global = st.session_state["global_custo_h_imp"]
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📥 Downloads de Arquivos")
-if os.path.exists(ARQUIVO_CATALOGO):
-    with open(ARQUIVO_CATALOGO, "rb") as f:
+caminho_dl = os.path.abspath(ARQUIVO_CATALOGO)
+if os.path.exists(caminho_dl):
+    with open(caminho_dl, "rb") as f:
         st.sidebar.download_button("📥 Baixar Catálogo (CSV)", data=f, file_name=ARQUIVO_CATALOGO, mime="text/csv")
 
 # ==========================================
@@ -201,8 +208,9 @@ elif st.session_state["pagina"] == "Catálogo":
     with col_limpar:
         if st.button("🗑️ Limpar Todo o Catálogo", type="secondary"):
             st.session_state["catalogo"] = []
-            if os.path.exists(ARQUIVO_CATALOGO):
-                os.remove(ARQUIVO_CATALOGO)
+            caminho_rem = os.path.abspath(ARQUIVO_CATALOGO)
+            if os.path.exists(caminho_rem):
+                os.remove(caminho_rem)
             st.success("Catálogo limpo com sucesso!")
             st.rerun()
         
@@ -402,7 +410,7 @@ elif st.session_state["pagina"] == "Calcular":
         st.metric(label="Preço Sugerido", value=f"€ {preco_venda:.2f}")
 
 # ==========================================
-# 4. COMPRAS E 5. PRODUÇÃO (Estrutura Básica Mantida)
+# 4. COMPRAS E 5. PRODUÇÃO
 # ==========================================
 elif st.session_state["pagina"] == "Compras":
     st.markdown("## 🛒 Cadastro de Compras de Insumos")

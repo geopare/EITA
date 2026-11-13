@@ -19,7 +19,7 @@ categorias_produtos_lista = ["Decoração", "Utilidades", "Acessórios", "Natal"
 
 def obter_prefixo_categoria(cat_str):
     c = str(cat_str).strip().lower()
-    if "decor" in c: return "DEC"
+    if "decor" in c or "decora" in c: return "DEC"
     elif "util" in c: return "UTI"
     elif "acess" in c: return "ACE"
     elif "natal" in c: return "NAT"
@@ -28,15 +28,25 @@ def obter_prefixo_categoria(cat_str):
 
 def normalizar_categoria(cat_str):
     c = str(cat_str).strip().lower()
-    if any(k in c for k in ["decor", "vaso", "planta", "decoração"]): return "Decoração"
-    elif any(k in c for k in ["util", "utilid", "utilidades"]): return "Utilidades"
-    elif any(k in c for k in ["acess", "acessórios", "suporte"]): return "Acessórios"
-    elif any(k in c for k in ["natal", "bola", "pinheiro", "noel"]): return "Natal"
-    elif any(k in c for k in ["laç", "lac", "laco", "laços", "chaveiro", "cha"]): return "Laços"
-    elif any(k in c for k in ["out", "outros"]): return "Outros"
+    if not c or c == "nan": return "Outros"
     
+    # Mapeamento flexível sem restrição de acentos
+    if any(k in c for k in ["decor", "vaso", "planta", "decora"]): return "Decoração"
+    elif any(k in c for k in ["util", "utilid"]): return "Utilidades"
+    elif any(k in c for k in ["acess", "suporte"]): return "Acessórios"
+    elif any(k in c for k in ["natal", "bola", "pinheiro", "noel", "vela"]): return "Natal"
+    elif any(k in c for k in ["laç", "lac", "laco", "chaveiro", "cha"]): return "Laços"
+    elif any(k in c for k in ["out"]): return "Outros"
+    
+    # Compara ignorando acentos e maiúsculas
+    import unicodedata
+    def remover_acentos(texto):
+        nfkd = unicodedata.normalize('NFKD', texto)
+        return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
+    
+    c_limpo = remover_acentos(c)
     for oficial in categorias_produtos_lista:
-        if oficial.lower() == c:
+        if remover_acentos(oficial) in c_limpo or c_limpo in remover_acentos(oficial):
             return oficial
             
     return "Outros"
@@ -65,8 +75,6 @@ def carregar_catalogo():
             
             for _, r in df_cat.iterrows():
                 cat_raw = str(r.get("categoria", r.get("category", "Outros")))
-                if cat_raw == "nan" or not cat_raw.strip():
-                    cat_raw = "Outros"
                 cat_nome = normalizar_categoria(cat_raw)
                 
                 codigo = str(r.get("codigo", r.get("sku", "")))
@@ -333,7 +341,7 @@ elif st.session_state["pagina"] == "Catálogo":
         st.info("Nenhum produto cadastrado no catálogo ainda.")
     else:
         for cat in categorias_produtos_lista:
-            prods_filtrados = [p for p in st.session_state["catalogo"] if str(p.get("categoria")).strip() == cat]
+            prods_filtrados = [p for p in st.session_state["catalogo"] if normalizar_categoria(p.get("categoria")) == cat]
             
             if prods_filtrados:
                 with st.expander(f"📁 **{cat}** ({len(prods_filtrados)} produtos)"):

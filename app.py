@@ -29,34 +29,42 @@ for arquivo, colunas in [
 
 def obter_prefixo_categoria(cat_str):
     """Retorna o prefixo exato de acordo com a categoria"""
-    c = str(cat_str).strip().lower()
-    if "decor" in c:
+    c = str(cat_str).strip().upper()
+    if "DEC" in c or "DECOR" in c:
         return "DEC"
-    elif "util" in c:
+    elif "UTI" in c:
         return "UTI"
-    elif "acess" in c:
+    elif "ACE" in c:
         return "ACE"
-    elif "natal" in c:
+    elif "NAT" in c:
         return "NAT"
-    elif "laç" in c or "lac" in c:
+    elif "LAC" in c or "LAÇ" in c or "CHA" in c:
         return "LAC"
     else:
         return "OUT"
 
 def normalizar_categoria(cat_str):
-    """Padroniza e mapeia corretamente as categorias existentes"""
+    """Padroniza e mapeia corretamente as categorias existentes sem jogar tudo para Outros"""
     c = str(cat_str).strip().lower()
-    if "decor" in c:
+    if any(k in c for k in ["decor", "vaso", "planta", "decoração"]):
         return "Decoração"
-    elif "util" in c:
+    elif any(k in c for k in ["util", "utilid", "utilidades"]):
         return "Utilidades"
-    elif "acess" in c:
+    elif any(k in c for k in ["acess", "acessórios", "suporte"]):
         return "Acessórios"
-    elif "natal" in c:
+    elif any(k in c for k in ["natal", "bola", "pinheiro", "noel"]):
         return "Natal"
-    elif "laç" in c or "lac" in c:
+    elif any(k in c for k in ["laç", "lac", "laco", "laços", "chaveiro", "cha"]):
         return "Laços"
+    elif any(k in c for k in ["out", "outros"]):
+        return "Outros"
     else:
+        # Se contiver prefixos exatos
+        if "dec" in c: return "Decoração"
+        if "uti" in c: return "Utilidades"
+        if "ace" in c: return "Acessórios"
+        if "nat" in c: return "Natal"
+        if "lac" in c or "laç" in c: return "Laços"
         return "Outros"
 
 # ==========================================
@@ -76,13 +84,23 @@ if "edit_idx_catalogo" not in st.session_state:
 
 def carregar_catalogo():
     lista_carregada = []
+    
+    # Tenta carregar do catálogo principal
     if os.path.exists(ARQUIVO_CATALOGO):
         try:
             df_cat = pd.read_csv(ARQUIVO_CATALOGO)
             for _, r in df_cat.iterrows():
-                cat_nome = normalizar_categoria(r.get("categoria", "Outros"))
+                cat_raw = str(r.get("categoria", "Outros"))
+                cat_nome = normalizar_categoria(cat_raw)
+                
+                # Preserva o código original se já tiver prefixo válido, senão gera
+                cod_original = str(r.get("codigo", ""))
+                if not cod_original or cod_original == "nan" or "-" not in cod_original:
+                    pref = obter_prefixo_categoria(cat_nome)
+                    cod_original = f"{pref}-001"
+
                 lista_carregada.append({
-                    "codigo": str(r.get("codigo", "SKU-001")),
+                    "codigo": cod_original,
                     "nome": str(r.get("nome", "Produto")),
                     "categoria": cat_nome,
                     "gramas_pla": float(r.get("gramas_pla", r.get("material", 0.0))),
@@ -94,13 +112,17 @@ def carregar_catalogo():
         except:
             pass
 
+    # Se vazio, tenta o arquivo antigo
     if not lista_carregada and os.path.exists(ARQUIVO_ANTIGO):
         try:
             df_old = pd.read_csv(ARQUIVO_ANTIGO)
             for _, r in df_old.iterrows():
-                cat_nome = normalizar_categoria(r.get("categoria", "Outros"))
+                cat_raw = str(r.get("categoria", "Outros"))
+                cat_nome = normalizar_categoria(cat_raw)
+                cod_original = str(r.get("codigo", "SKU-001"))
+                
                 lista_carregada.append({
-                    "codigo": str(r.get("codigo", "SKU-001")),
+                    "codigo": cod_original,
                     "nome": str(r.get("nome", "Produto")),
                     "categoria": cat_nome,
                     "gramas_pla": float(r.get("material", 0.0)),
@@ -111,6 +133,7 @@ def carregar_catalogo():
                 })
         except:
             pass
+            
     return lista_carregada
 
 if "catalogo" not in st.session_state or not st.session_state["catalogo"]:
@@ -243,7 +266,6 @@ elif st.session_state["pagina"] == "Catálogo":
             st.rerun()
     with col_org:
         if st.button("🔢 Reorganizar Códigos"):
-            # Rotina para reenumerar sequencialmente por categoria
             contadores = {cat: 1 for cat in categorias_produtos_lista}
             for prod in st.session_state["catalogo"]:
                 cat = normalizar_categoria(prod.get("categoria", "Outros"))
@@ -252,7 +274,7 @@ elif st.session_state["pagina"] == "Catálogo":
                 prod["codigo"] = f"{pref}-{contadores[cat]:03d}"
                 contadores[cat] += 1
             salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
-            st.success("Códigos reorganizados com sucesso!")
+            st.success("Códigos reorganizados por categoria!")
             st.rerun()
         
     produto_em_edicao = st.session_state["catalogo"][edit_idx] if is_editing else {}
@@ -302,7 +324,6 @@ elif st.session_state["pagina"] == "Catálogo":
         st.markdown("##### 📸 Foto do Produto")
         foto_upload = st.file_uploader("Fazer Upload da Imagem", type=["jpg", "jpeg", "png"])
 
-    # Cálculo dinâmico em tempo real exibindo AMBOS os valores
     c_pla_preview = gramas_pla * custo_g_pla_global
     c_horas_preview = horas_imp * custo_h_imp_global
     c_extras_preview = (custo_nfc if usa_nfc else 0.0) + (custo_argola if usa_argola else 0.0) + (custo_outros if usa_outros else 0.0)
@@ -313,7 +334,7 @@ elif st.session_state["pagina"] == "Catálogo":
     st.markdown("### 🏷️ Resumo de Valores em Tempo Real")
     m1, m2 = st.columns(2)
     with m1:
-        st.metric(label="⚙️ Custo de Produção (Insumos + Tempo)", value=f"€ {custo_total_preview:.2f}")
+        st.metric(label="⚙️ Custo de Produção", value=f"€ {custo_total_preview:.2f}")
     with m2:
         st.metric(label=f"💰 Preço de Venda (Com {margem_lucro:.0f}% de Lucro)", value=f"€ {preco_final_preview:.2f}")
 

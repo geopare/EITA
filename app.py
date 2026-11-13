@@ -6,11 +6,12 @@ from datetime import date
 # Configuração da Página
 st.set_page_config(page_title="Gestão EITA", page_icon="🖨️", layout="wide")
 
-# Caminhos dos arquivos e pastas
-PASTA_IMAGENS = "imagens"
-ARQUIVO_CATALOGO = "catalogo_produtos.csv"
-ARQUIVO_COMPRAS = "compras_insumos.csv"
-ARQUIVO_PRODUCAO = "producao_lotes.csv"
+# Caminhos absolutos dos arquivos e pastas para garantir persistência local correta
+DIRETORIO_BASE = os.path.abspath(os.path.dirname(__file__))
+PASTA_IMAGENS = os.path.join(DIRETORIO_BASE, "imagens")
+ARQUIVO_CATALOGO = os.path.join(DIRETORIO_BASE, "catalogo_produtos.csv")
+ARQUIVO_COMPRAS = os.path.join(DIRETORIO_BASE, "compras_insumos.csv")
+ARQUIVO_PRODUCAO = os.path.join(DIRETORIO_BASE, "producao_lotes.csv")
 
 os.makedirs(PASTA_IMAGENS, exist_ok=True)
 
@@ -52,10 +53,9 @@ if "edit_idx_catalogo" not in st.session_state:
 
 def carregar_catalogo():
     lista_carregada = []
-    caminho_abs = os.path.abspath(ARQUIVO_CATALOGO)
-    if os.path.exists(caminho_abs):
+    if os.path.exists(ARQUIVO_CATALOGO):
         try:
-            df_cat = pd.read_csv(caminho_abs)
+            df_cat = pd.read_csv(ARQUIVO_CATALOGO)
             df_cat.columns = [str(c).strip().lower() for c in df_cat.columns]
             
             for _, r in df_cat.iterrows():
@@ -69,8 +69,14 @@ def carregar_catalogo():
                 g_pla = float(r.get("material", r.get("gramas_pla", 0.0)))
                 h_imp = float(r.get("tempo", r.get("horas_imp", 0.0)))
                 p_calc = float(r.get("venda", r.get("producao", 0.0)))
+                
                 foto_path = str(r.get("imagem", r.get("foto", "")))
-                if foto_path == "nan": foto_path = ""
+                if foto_path == "nan" or not foto_path:
+                    foto_path = ""
+                else:
+                    # Se o caminho salvo for relativo, converte para absoluto correto
+                    if not os.path.isabs(foto_path):
+                        foto_path = os.path.join(DIRETORIO_BASE, foto_path)
 
                 lista_carregada.append({
                     "codigo": codigo,
@@ -80,7 +86,7 @@ def carregar_catalogo():
                     "horas_imp": h_imp,
                     "extras": str(r.get("extras", "Nenhum")),
                     "preco_calculado": p_calc,
-                    "foto": foto_path
+                    "foto": foto_path if os.path.exists(foto_path) else ""
                 })
         except Exception as e:
             st.error(f"Erro ao carregar catálogo: {e}")
@@ -90,16 +96,14 @@ if "catalogo" not in st.session_state or not st.session_state["catalogo"]:
     st.session_state["catalogo"] = carregar_catalogo()
 
 if "compras" not in st.session_state:
-    caminho_c = os.path.abspath(ARQUIVO_COMPRAS)
-    if os.path.exists(caminho_c):
-        try: st.session_state["compras"] = pd.read_csv(caminho_c).to_dict("records")
+    if os.path.exists(ARQUIVO_COMPRAS):
+        try: st.session_state["compras"] = pd.read_csv(ARQUIVO_COMPRAS).to_dict("records")
         except: st.session_state["compras"] = []
     else: st.session_state["compras"] = []
 
 if "producao" not in st.session_state:
-    caminho_p = os.path.abspath(ARQUIVO_PRODUCAO)
-    if os.path.exists(caminho_p):
-        try: st.session_state["producao"] = pd.read_csv(caminho_p).to_dict("records")
+    if os.path.exists(ARQUIVO_PRODUCAO):
+        try: st.session_state["producao"] = pd.read_csv(ARQUIVO_PRODUCAO).to_dict("records")
         except: st.session_state["producao"] = []
     else: st.session_state["producao"] = []
 
@@ -108,6 +112,11 @@ def salvar_dados_catalogo(dados):
         os.makedirs(PASTA_IMAGENS, exist_ok=True)
         dados_para_salvar = []
         for p in dados:
+            foto_p = p.get("foto", "")
+            # Salva o caminho relativo limpo no CSV para evitar quebras entre ambientes
+            if foto_p and os.path.isabs(foto_p):
+                foto_p = os.path.relpath(foto_p, DIRETORIO_BASE)
+
             dados_para_salvar.append({
                 "codigo": p.get("codigo"),
                 "nome": p.get("nome"),
@@ -118,20 +127,22 @@ def salvar_dados_catalogo(dados):
                 "margem": 100.0,
                 "venda": p.get("preco_calculado"),
                 "lucro": p.get("preco_calculado") / 2.0,
-                "imagem": p.get("foto"),
+                "imagem": foto_p,
                 "gastos_extras": 0.0
             })
         df = pd.DataFrame(dados_para_salvar)
-        caminho_abs = os.path.abspath(ARQUIVO_CATALOGO)
-        df.to_csv(caminho_abs, index=False)
-        st.success(f"Catálogo guardado com sucesso!")
+        df.to_csv(ARQUIVO_CATALOGO, index=False)
     except Exception as e:
         st.error(f"Erro crítico ao salvar o catálogo: {e}")
 
 # Garante arquivos iniciais
-caminho_inicial_cat = os.path.abspath(ARQUIVO_CATALOGO)
-if not os.path.exists(caminho_inicial_cat):
-    pd.DataFrame(columns=["codigo", "nome", "categoria", "tempo", "material", "producao", "margem", "venda", "lucro", "imagem", "gastos_extras"]).to_csv(caminho_inicial_cat, index=False)
+for arquivo, colunas in [
+    (ARQUIVO_CATALOGO, ["codigo", "nome", "categoria", "tempo", "material", "producao", "margem", "venda", "lucro", "imagem", "gastos_extras"]),
+    (ARQUIVO_COMPRAS, ["material", "data_compra", "variedade", "quantidade", "unidade", "valor_compra", "identificacao_nota"]),
+    (ARQUIVO_PRODUCAO, ["codigo", "nome_produto", "categoria", "quantidade", "data_producao", "valor_total_lote"])
+]:
+    if not os.path.exists(arquivo):
+        pd.DataFrame(columns=colunas).to_csv(arquivo, index=False)
 
 # ==========================================
 # MENU LATERAL & CUSTOS BASE GLOBAIS
@@ -155,10 +166,15 @@ custo_h_imp_global = st.session_state["global_custo_h_imp"]
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📥 Downloads de Arquivos")
-caminho_dl = os.path.abspath(ARQUIVO_CATALOGO)
-if os.path.exists(caminho_dl):
-    with open(caminho_dl, "rb") as f:
-        st.sidebar.download_button("📥 Baixar Catálogo (CSV)", data=f, file_name=ARQUIVO_CATALOGO, mime="text/csv")
+
+def criar_botao_download(caminho_arq, label_btn):
+    if os.path.exists(caminho_arq):
+        with open(caminho_arq, "rb") as f:
+            st.sidebar.download_button(label=label_btn, data=f, file_name=os.path.basename(caminho_arq), mime="text/csv")
+
+criar_botao_download(ARQUIVO_CATALOGO, "📥 Baixar Catálogo (CSV)")
+criar_botao_download(ARQUIVO_COMPRAS, "📥 Baixar Compras (CSV)")
+criar_botao_download(ARQUIVO_PRODUCAO, "📥 Baixar Produção (CSV)")
 
 # ==========================================
 # 1. PÁGINA INICIAL (HOME)
@@ -208,9 +224,8 @@ elif st.session_state["pagina"] == "Catálogo":
     with col_limpar:
         if st.button("🗑️ Limpar Todo o Catálogo", type="secondary"):
             st.session_state["catalogo"] = []
-            caminho_rem = os.path.abspath(ARQUIVO_CATALOGO)
-            if os.path.exists(caminho_rem):
-                os.remove(caminho_rem)
+            if os.path.exists(ARQUIVO_CATALOGO):
+                os.remove(ARQUIVO_CATALOGO)
             st.success("Catálogo limpo com sucesso!")
             st.rerun()
         
@@ -284,7 +299,8 @@ elif st.session_state["pagina"] == "Catálogo":
             if foto_upload is not None:
                 os.makedirs(PASTA_IMAGENS, exist_ok=True)
                 ext = foto_upload.name.split(".")[-1]
-                caminho_foto = os.path.join(PASTA_IMAGENS, f"{codigo_automatico}.{ext}")
+                nome_arquivo_img = f"{codigo_automatico}.{ext}"
+                caminho_foto = os.path.join(PASTA_IMAGENS, nome_arquivo_img)
                 with open(caminho_foto, "wb") as f:
                     f.write(foto_upload.getbuffer())
 
@@ -360,7 +376,7 @@ elif st.session_state["pagina"] == "Catálogo":
                             if foto_p and os.path.exists(foto_p):
                                 st.image(foto_p, use_container_width=True)
                             else:
-                                st.caption("No image")
+                                st.caption("Sem imagem")
                         
                         real_idx = st.session_state["catalogo"].index(prod)
                         
@@ -410,18 +426,128 @@ elif st.session_state["pagina"] == "Calcular":
         st.metric(label="Preço Sugerido", value=f"€ {preco_venda:.2f}")
 
 # ==========================================
-# 4. COMPRAS E 5. PRODUÇÃO
+# 4. COMPRAS
 # ==========================================
 elif st.session_state["pagina"] == "Compras":
     st.markdown("## 🛒 Cadastro de Compras de Insumos")
-    if st.button("⬅️ Voltar"):
+    st.markdown("---")
+    if st.button("⬅️ Voltar para a Página Inicial"):
         st.session_state["pagina"] = "Início"
         st.rerun()
-    st.info("Módulo de compras ativo.")
+        
+    with st.form("form_compra_detalhada"):
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            material = st.selectbox("Material", ["PLA", "Argolas", "NFC", "OUTROS"])
+            data_compra = st.date_input("Data da Compra", value=date.today())
+            variedade = st.text_input("Variedade (Cor / Modelo / Marca)", placeholder="Ex: Azul Seda, 12mm, NTAG216")
+        with col_c2:
+            col_q1, col_q2 = st.columns(2)
+            with col_q1:
+                qtd = st.number_input("Quantidade", min_value=0.01, value=1.0, step=1.0)
+            with col_q2:
+                unidade_medida = st.selectbox("Unidade", ["KG", "Unidades", "Gramas", "Metros"])
+            valor_compra = st.number_input("Valor da Compra (€)", min_value=0.0, value=20.0, step=1.0)
+            identificacao_nota = st.text_input("Identificação da Nota (NF / Fatura)", placeholder="Ex: NF-12345")
+            
+        if st.form_submit_button("Salvar Compra"):
+            nova_compra = {
+                "material": material,
+                "data_compra": str(data_compra),
+                "variedade": variedade,
+                "quantidade": qtd,
+                "unidade": unidade_medida,
+                "valor_compra": valor_compra,
+                "identificacao_nota": identificacao_nota
+            }
+            st.session_state["compras"].append(nova_compra)
+            pd.DataFrame(st.session_state["compras"]).to_csv(ARQUIVO_COMPRAS, index=False)
+            st.success("Compra cadastrada com sucesso!")
+            st.rerun()
 
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("📋 Ver / Ocultar Compras Salvas"):
+        st.session_state["mostrar_tabela_compras"] = not st.session_state["mostrar_tabela_compras"]
+
+    if st.session_state["mostrar_tabela_compras"]:
+        st.markdown("### 📦 Histórico de Compras")
+        if not st.session_state["compras"]:
+            st.info("Nenhuma compra registrada.")
+        else:
+            st.dataframe(pd.DataFrame(st.session_state["compras"]), use_container_width=True)
+            if st.button("🗑️ Apagar Última Compra"):
+                st.session_state["compras"].pop()
+                pd.DataFrame(st.session_state["compras"]).to_csv(ARQUIVO_COMPRAS, index=False)
+                st.success("Removido!")
+                st.rerun()
+
+# ==========================================
+# 5. PRODUÇÃO
+# ==========================================
 elif st.session_state["pagina"] == "Produção":
     st.markdown("## ⚙️ Registro de Produção de Lotes")
-    if st.button("⬅️ Voltar"):
+    st.markdown("---")
+    if st.button("⬅️ Voltar para a Página Inicial"):
         st.session_state["pagina"] = "Início"
         st.rerun()
-    st.info("Módulo de produção ativo.")
+        
+    if not st.session_state["catalogo"]:
+        st.warning("⚠️ Cadastre produtos no Catálogo primeiro para poder registrar lotes de produção.")
+    else:
+        nomes_produtos = [p["nome"] for p in st.session_state["catalogo"]]
+        produto_escolhido = st.selectbox("Selecione o Produto do Catálogo", nomes_produtos)
+        
+        prod_atual = next((p for p in st.session_state["catalogo"] if p["nome"] == produto_escolhido), {})
+        
+        g_prod = float(prod_atual.get("gramas_pla", 0.0))
+        h_prod = float(prod_atual.get("horas_imp", 0.0))
+        preco_unit = (g_prod * custo_g_pla_global + h_prod * custo_h_imp_global) * 2.0
+        
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            codigo_prod = prod_atual.get("codigo", "SKU-000")
+            st.text_input("Código", value=codigo_prod, disabled=True)
+            categoria_prod = prod_atual.get("categoria", "Decoração")
+            st.text_input("Categoria", value=categoria_prod, disabled=True)
+            quantidade_lote = st.number_input("Quantidade no Lote", min_value=1, value=1, step=1)
+            data_producao = st.date_input("Data da Produção", value=date.today())
+            
+        with col_p2:
+            st.metric(label="Preço Unitário (100%)", value=f"€ {preco_unit:.2f}")
+            st.metric(label="Valor Total do Lote", value=f"€ {preco_unit * quantidade_lote:.2f}")
+            
+            foto_p = str(prod_atual.get("foto", ""))
+            if foto_p and os.path.exists(foto_p):
+                st.image(foto_p, width=150, caption=produto_escolhido)
+            else:
+                st.caption("Sem foto.")
+                
+        if st.button("💾 Salvar Lote Produzido"):
+            nova_prod = {
+                "codigo": codigo_prod,
+                "nome_produto": produto_escolhido,
+                "categoria": categoria_prod,
+                "quantidade": quantidade_lote,
+                "data_producao": str(data_producao),
+                "valor_total_lote": round(preco_unit * quantidade_lote, 2)
+            }
+            st.session_state["producao"].append(nova_prod)
+            pd.DataFrame(st.session_state["producao"]).to_csv(ARQUIVO_PRODUCAO, index=False)
+            st.success("Produção registrada com sucesso!")
+            st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("📋 Ver / Ocultar Histórico de Produção"):
+        st.session_state["mostrar_tabela_producao"] = not st.session_state["mostrar_tabela_producao"]
+
+    if st.session_state["mostrar_tabela_producao"]:
+        st.markdown("### 📦 Lotes Produzidos")
+        if not st.session_state["producao"]:
+            st.info("Nenhum lote registrado.")
+        else:
+            st.dataframe(pd.DataFrame(st.session_state["producao"]), use_container_width=True)
+            if st.button("🗑️ Apagar Último Registro"):
+                st.session_state["producao"].pop()
+                pd.DataFrame(st.session_state["producao"]).to_csv(ARQUIVO_PRODUCAO, index=False)
+                st.success("Removido!")
+                st.rerun()

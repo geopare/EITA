@@ -30,7 +30,6 @@ def normalizar_categoria(cat_str):
     c = str(cat_str).strip().lower()
     if not c or c == "nan": return "Outros"
     
-    # Mapeamento flexível sem restrição de acentos
     if any(k in c for k in ["decor", "vaso", "planta", "decora"]): return "Decoração"
     elif any(k in c for k in ["util", "utilid"]): return "Utilidades"
     elif any(k in c for k in ["acess", "suporte"]): return "Acessórios"
@@ -38,7 +37,6 @@ def normalizar_categoria(cat_str):
     elif any(k in c for k in ["laç", "lac", "laco", "chaveiro", "cha"]): return "Laços"
     elif any(k in c for k in ["out"]): return "Outros"
     
-    # Compara ignorando acentos e maiúsculas
     import unicodedata
     def remover_acentos(texto):
         nfkd = unicodedata.normalize('NFKD', texto)
@@ -205,7 +203,7 @@ elif st.session_state["pagina"] == "Catálogo":
     st.markdown(f"## {titulo_pagina}")
     st.markdown("---")
     
-    col_vol, col_rec, col_org = st.columns([3, 1, 1])
+    col_vol, col_rec = st.columns([4, 1])
     with col_vol:
         if st.button("⬅️ Voltar para a Página Inicial"):
             st.session_state["pagina"] = "Início"
@@ -215,18 +213,6 @@ elif st.session_state["pagina"] == "Catálogo":
         if st.button("🔄 Atualizar"):
             st.session_state["catalogo"] = carregar_catalogo()
             st.success("Recarregado!")
-            st.rerun()
-    with col_org:
-        if st.button("🔢 Reorganizar Códigos"):
-            contadores = {cat: 1 for cat in categorias_produtos_lista}
-            for prod in st.session_state["catalogo"]:
-                cat = normalizar_categoria(prod.get("categoria", "Outros"))
-                prod["categoria"] = cat
-                pref = obter_prefixo_categoria(cat)
-                prod["codigo"] = f"{pref}-{contadores[cat]:03d}"
-                contadores[cat] += 1
-            salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
-            st.success("Códigos reorganizados por categoria!")
             st.rerun()
         
     produto_em_edicao = st.session_state["catalogo"][edit_idx] if is_editing else {}
@@ -362,7 +348,7 @@ elif st.session_state["pagina"] == "Catálogo":
                             extra_val = 0.40
                         
                         custo_total_prod = c_pla_val + c_hora_val + extra_val
-                        preco_venda_atual = custo_total_prod * 2.0  # 100% de ganho
+                        preco_venda_atual = custo_total_prod * 2.0
 
                         st.markdown(f"**🏷️ [{prod.get('codigo')}] {prod.get('nome')}**")
                         c1, c2 = st.columns([3, 1])

@@ -368,18 +368,17 @@ elif st.session_state["pagina"] == "Catálogo":
                             if foto_p and os.path.exists(foto_p):
                                 st.image(foto_p, use_container_width=True)
                             else:
-                                st.caption("Sem foto")
+                                st.caption("No image")
                         
                         real_idx = st.session_state["catalogo"].index(prod)
-                        codigo_produto_atual = prod.get("codigo", f"prod_{real_idx}")
                         
                         col_b1, col_b2 = st.columns(2)
                         with col_b1:
-                            if st.button("✏️ Editar", key=f"edit_btn_{codigo_produto_atual}"):
+                            if st.button("✏️ Editar", key=f"edit_idx_{real_idx}"):
                                 st.session_state["edit_idx_catalogo"] = real_idx
                                 st.rerun()
                         with col_b2:
-                            if st.button("🗑️ Excluir", key=f"del_btn_{codigo_produto_atual}"):
+                            if st.button("🗑️ Excluir", key=f"del_idx_{real_idx}"):
                                 st.session_state["catalogo"].remove(prod)
                                 salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
                                 st.success("Produto removido!")

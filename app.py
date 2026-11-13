@@ -79,10 +79,13 @@ def carregar_catalogo():
                 if not codigo or codigo == "nan" or "-" not in codigo:
                     codigo = f"{obter_prefixo_categoria(cat_nome)}-001"
 
-                g_pla = float(r.get("gramas_pla", r.get("material", r.get("gramas", 0.0))))
-                h_imp = float(r.get("horas_imp", r.get("tempo", r.get("horas", 0.0))))
-                p_calc = float(r.get("preco_calculado", r.get("producao", r.get("preco", 0.0))))
-                foto_path = str(r.get("foto", r.get("imagem", "")))
+                # Mapeia as colunas exatas vistas no seu CSV (material = gramas, tempo = horas)
+                g_pla = float(r.get("material", r.get("gramas_pla", r.get("gramas", 0.0))))
+                h_imp = float(r.get("tempo", r.get("horas_imp", r.get("horas", 0.0))))
+                p_calc = float(r.get("producao", r.get("preco_calculado", r.get("preco", 0.0))))
+                
+                # Lê a coluna imagem/foto do CSV
+                foto_path = str(r.get("imagem", r.get("foto", "")))
                 if foto_path == "nan": foto_path = ""
 
                 lista_carregada.append({
@@ -123,7 +126,7 @@ def salvar_dados(caminho, dados):
 
 # Garante a criação inicial dos arquivos CSV se não existirem
 for arquivo, colunas in [
-    (ARQUIVO_CATALOGO, ["codigo", "nome", "categoria", "gramas_pla", "horas_imp", "extras", "preco_calculado", "foto"]),
+    (ARQUIVO_CATALOGO, ["codigo", "nome", "categoria", "tempo", "material", "producao", "margem", "venda", "lucro", "imagem", "gastos_extras"]),
     (ARQUIVO_COMPRAS, ["material", "data_compra", "variedade", "quantidade", "unidade", "valor_compra", "identificacao_nota"]),
     (ARQUIVO_PRODUCAO, ["codigo", "nome_produto", "categoria", "quantidade", "data_producao", "valor_total_lote"])
 ]:
@@ -311,7 +314,23 @@ elif st.session_state["pagina"] == "Catálogo":
                 st.session_state["catalogo"].append(novo_item)
                 msg = f"Produto '{nome_prod}' cadastrado com sucesso no catálogo!"
 
-            salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
+            # Salva mantendo compatibilidade com as colunas do CSV original
+            dados_para_salvar = []
+            for p in st.session_state["catalogo"]:
+                dados_para_salvar.append({
+                    "codigo": p.get("codigo"),
+                    "nome": p.get("nome"),
+                    "categoria": p.get("categoria"),
+                    "tempo": p.get("horas_imp"),
+                    "material": p.get("gramas_pla"),
+                    "producao": p.get("preco_calculado") / 2.0,
+                    "margem": 100.0,
+                    "venda": p.get("preco_calculado"),
+                    "lucro": p.get("preco_calculado") / 2.0,
+                    "imagem": p.get("foto"),
+                    "gastos_extras": 0.0
+                })
+            salvar_dados(ARQUIVO_CATALOGO, dados_para_salvar)
             st.success(msg)
             st.rerun()
 
@@ -374,7 +393,23 @@ elif st.session_state["pagina"] == "Catálogo":
                         with col_b2:
                             if st.button("🗑️ Excluir", key=f"del_cat_{cat}_{i}"):
                                 st.session_state["catalogo"].remove(prod)
-                                salvar_dados(ARQUIVO_CATALOGO, st.session_state["catalogo"])
+                                
+                                dados_para_salvar = []
+                                for p in st.session_state["catalogo"]:
+                                    dados_para_salvar.append({
+                                        "codigo": p.get("codigo"),
+                                        "nome": p.get("nome"),
+                                        "categoria": p.get("categoria"),
+                                        "tempo": p.get("horas_imp"),
+                                        "material": p.get("gramas_pla"),
+                                        "producao": p.get("preco_calculado") / 2.0,
+                                        "margem": 100.0,
+                                        "venda": p.get("preco_calculado"),
+                                        "lucro": p.get("preco_calculado") / 2.0,
+                                        "imagem": p.get("foto"),
+                                        "gastos_extras": 0.0
+                                    })
+                                salvar_dados(ARQUIVO_CATALOGO, dados_para_salvar)
                                 st.success("Produto removido!")
                                 st.rerun()
                         st.markdown("---")

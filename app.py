@@ -9,63 +9,38 @@ st.set_page_config(page_title="Gestão EITA", page_icon="🖨️", layout="wide"
 # Caminhos dos arquivos e pastas
 PASTA_IMAGENS = "imagens"
 ARQUIVO_CATALOGO = "catalogo_produtos.csv"
-ARQUIVO_ANTIGO = "produtos_3d.csv"
 ARQUIVO_COMPRAS = "compras_insumos.csv"
 ARQUIVO_PRODUCAO = "producao_lotes.csv"
 
 os.makedirs(PASTA_IMAGENS, exist_ok=True)
 
-# Categorias oficiais e separadas
+# Categorias oficiais fixas
 categorias_produtos_lista = ["Decoração", "Utilidades", "Acessórios", "Natal", "Laços", "Outros"]
 
-# Garante a criação inicial dos arquivos CSV se não existirem
-for arquivo, colunas in [
-    (ARQUIVO_CATALOGO, ["codigo", "nome", "categoria", "gramas_pla", "horas_imp", "extras", "preco_calculado", "foto"]),
-    (ARQUIVO_COMPRAS, ["material", "data_compra", "variedade", "quantidade", "unidade", "valor_compra", "identificacao_nota"]),
-    (ARQUIVO_PRODUCAO, ["codigo", "nome_produto", "categoria", "quantidade", "data_producao", "valor_total_lote"])
-]:
-    if not os.path.exists(arquivo):
-        pd.DataFrame(columns=colunas).to_csv(arquivo, index=False)
-
 def obter_prefixo_categoria(cat_str):
-    """Retorna o prefixo exato de acordo com a categoria"""
-    c = str(cat_str).strip().upper()
-    if "DEC" in c or "DECOR" in c:
-        return "DEC"
-    elif "UTI" in c:
-        return "UTI"
-    elif "ACE" in c:
-        return "ACE"
-    elif "NAT" in c:
-        return "NAT"
-    elif "LAC" in c or "LAÇ" in c or "CHA" in c:
-        return "LAC"
-    else:
-        return "OUT"
+    c = str(cat_str).strip().lower()
+    if "decor" in c: return "DEC"
+    elif "util" in c: return "UTI"
+    elif "acess" in c: return "ACE"
+    elif "natal" in c: return "NAT"
+    elif "laç" in c or "lac" in c or "cha" in c: return "LAC"
+    else: return "OUT"
 
 def normalizar_categoria(cat_str):
-    """Padroniza e mapeia corretamente as categorias existentes sem jogar tudo para Outros"""
     c = str(cat_str).strip().lower()
-    if any(k in c for k in ["decor", "vaso", "planta", "decoração"]):
-        return "Decoração"
-    elif any(k in c for k in ["util", "utilid", "utilidades"]):
-        return "Utilidades"
-    elif any(k in c for k in ["acess", "acessórios", "suporte"]):
-        return "Acessórios"
-    elif any(k in c for k in ["natal", "bola", "pinheiro", "noel"]):
-        return "Natal"
-    elif any(k in c for k in ["laç", "lac", "laco", "laços", "chaveiro", "cha"]):
-        return "Laços"
-    elif any(k in c for k in ["out", "outros"]):
-        return "Outros"
-    else:
-        # Se contiver prefixos exatos
-        if "dec" in c: return "Decoração"
-        if "uti" in c: return "Utilidades"
-        if "ace" in c: return "Acessórios"
-        if "nat" in c: return "Natal"
-        if "lac" in c or "laç" in c: return "Laços"
-        return "Outros"
+    if any(k in c for k in ["decor", "vaso", "planta", "decoração"]): return "Decoração"
+    elif any(k in c for k in ["util", "utilid", "utilidades"]): return "Utilidades"
+    elif any(k in c for k in ["acess", "acessórios", "suporte"]): return "Acessórios"
+    elif any(k in c for k in ["natal", "bola", "pinheiro", "noel"]): return "Natal"
+    elif any(k in c for k in ["laç", "lac", "laco", "laços", "chaveiro", "cha"]): return "Laços"
+    elif any(k in c for k in ["out", "outros"]): return "Outros"
+    
+    # Se bater com a lista oficial exata
+    for oficial in categorias_produtos_lista:
+        if oficial.lower() == c:
+            return oficial
+            
+    return "Outros"
 
 # ==========================================
 # GERENCIAMENTO DE ESTADO E CARREGAMENTO
@@ -84,8 +59,6 @@ if "edit_idx_catalogo" not in st.session_state:
 
 def carregar_catalogo():
     lista_carregada = []
-    
-    # Tenta carregar do catálogo principal
     if os.path.exists(ARQUIVO_CATALOGO):
         try:
             df_cat = pd.read_csv(ARQUIVO_CATALOGO)
@@ -93,47 +66,22 @@ def carregar_catalogo():
                 cat_raw = str(r.get("categoria", "Outros"))
                 cat_nome = normalizar_categoria(cat_raw)
                 
-                # Preserva o código original se já tiver prefixo válido, senão gera
-                cod_original = str(r.get("codigo", ""))
-                if not cod_original or cod_original == "nan" or "-" not in cod_original:
-                    pref = obter_prefixo_categoria(cat_nome)
-                    cod_original = f"{pref}-001"
+                codigo = str(r.get("codigo", ""))
+                if not codigo or codigo == "nan" or "-" not in codigo:
+                    codigo = f"{obter_prefixo_categoria(cat_nome)}-001"
 
                 lista_carregada.append({
-                    "codigo": cod_original,
+                    "codigo": codigo,
                     "nome": str(r.get("nome", "Produto")),
                     "categoria": cat_nome,
-                    "gramas_pla": float(r.get("gramas_pla", r.get("material", 0.0))),
-                    "horas_imp": float(r.get("horas_imp", r.get("tempo", 0.0))),
+                    "gramas_pla": float(r.get("gramas_pla", 0.0)),
+                    "horas_imp": float(r.get("horas_imp", 0.0)),
                     "extras": str(r.get("extras", "Nenhum")),
-                    "preco_calculado": float(r.get("preco_calculado", r.get("producao", 0.0))),
-                    "foto": str(r.get("foto", r.get("imagem", "")))
+                    "preco_calculado": float(r.get("preco_calculado", 0.0)),
+                    "foto": str(r.get("foto", ""))
                 })
-        except:
-            pass
-
-    # Se vazio, tenta o arquivo antigo
-    if not lista_carregada and os.path.exists(ARQUIVO_ANTIGO):
-        try:
-            df_old = pd.read_csv(ARQUIVO_ANTIGO)
-            for _, r in df_old.iterrows():
-                cat_raw = str(r.get("categoria", "Outros"))
-                cat_nome = normalizar_categoria(cat_raw)
-                cod_original = str(r.get("codigo", "SKU-001"))
-                
-                lista_carregada.append({
-                    "codigo": cod_original,
-                    "nome": str(r.get("nome", "Produto")),
-                    "categoria": cat_nome,
-                    "gramas_pla": float(r.get("material", 0.0)),
-                    "horas_imp": float(r.get("tempo", 0.0)),
-                    "extras": "Importado do sistema anterior",
-                    "preco_calculado": float(r.get("producao", 0.0)),
-                    "foto": str(r.get("imagem", ""))
-                })
-        except:
-            pass
-            
+        except Exception as e:
+            st.error(f"Erro ao carregar catálogo: {e}")
     return lista_carregada
 
 if "catalogo" not in st.session_state or not st.session_state["catalogo"]:
@@ -141,21 +89,15 @@ if "catalogo" not in st.session_state or not st.session_state["catalogo"]:
 
 if "compras" not in st.session_state:
     if os.path.exists(ARQUIVO_COMPRAS):
-        try:
-            st.session_state["compras"] = pd.read_csv(ARQUIVO_COMPRAS).to_dict("records")
-        except:
-            st.session_state["compras"] = []
-    else:
-        st.session_state["compras"] = []
+        try: st.session_state["compras"] = pd.read_csv(ARQUIVO_COMPRAS).to_dict("records")
+        except: st.session_state["compras"] = []
+    else: st.session_state["compras"] = []
 
 if "producao" not in st.session_state:
     if os.path.exists(ARQUIVO_PRODUCAO):
-        try:
-            st.session_state["producao"] = pd.read_csv(ARQUIVO_PRODUCAO).to_dict("records")
-        except:
-            st.session_state["producao"] = []
-    else:
-        st.session_state["producao"] = []
+        try: st.session_state["producao"] = pd.read_csv(ARQUIVO_PRODUCAO).to_dict("records")
+        except: st.session_state["producao"] = []
+    else: st.session_state["producao"] = []
 
 def salvar_dados(caminho, dados):
     try:
@@ -163,6 +105,15 @@ def salvar_dados(caminho, dados):
         df.to_csv(caminho, index=False)
     except Exception as e:
         st.error(f"Erro ao salvar arquivo {caminho}: {e}")
+
+# Garante a criação inicial dos arquivos CSV se não existirem
+for arquivo, colunas in [
+    (ARQUIVO_CATALOGO, ["codigo", "nome", "categoria", "gramas_pla", "horas_imp", "extras", "preco_calculado", "foto"]),
+    (ARQUIVO_COMPRAS, ["material", "data_compra", "variedade", "quantidade", "unidade", "valor_compra", "identificacao_nota"]),
+    (ARQUIVO_PRODUCAO, ["codigo", "nome_produto", "categoria", "quantidade", "data_producao", "valor_total_lote"])
+]:
+    if not os.path.exists(arquivo):
+        pd.DataFrame(columns=colunas).to_csv(arquivo, index=False)
 
 # ==========================================
 # MENU LATERAL & CUSTOS BASE GLOBAIS
@@ -175,17 +126,11 @@ st.session_state["pagina"] = escolha_lateral
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ⚙️ Custos Base Globais")
-if "global_preco_kg_pla" not in st.session_state:
-    st.session_state["global_preco_kg_pla"] = 20.00
-if "global_custo_h_imp" not in st.session_state:
-    st.session_state["global_custo_h_imp"] = 1.00
+if "global_preco_kg_pla" not in st.session_state: st.session_state["global_preco_kg_pla"] = 20.00
+if "global_custo_h_imp" not in st.session_state: st.session_state["global_custo_h_imp"] = 1.00
 
-st.session_state["global_preco_kg_pla"] = st.sidebar.number_input(
-    "Preço 1 KG PLA (€)", min_value=0.0, value=st.session_state["global_preco_kg_pla"], step=0.50, format="%.2f"
-)
-st.session_state["global_custo_h_imp"] = st.sidebar.number_input(
-    "Custo Hora Impressão (€/h)", min_value=0.0, value=st.session_state["global_custo_h_imp"], step=0.25, format="%.2f"
-)
+st.session_state["global_preco_kg_pla"] = st.sidebar.number_input("Preço 1 KG PLA (€)", min_value=0.0, value=st.session_state["global_preco_kg_pla"], step=0.50, format="%.2f")
+st.session_state["global_custo_h_imp"] = st.sidebar.number_input("Custo Hora Impressão (€/h)", min_value=0.0, value=st.session_state["global_custo_h_imp"], step=0.25, format="%.2f")
 
 custo_g_pla_global = st.session_state["global_preco_kg_pla"] / 1000.0
 custo_h_imp_global = st.session_state["global_custo_h_imp"]
@@ -196,12 +141,7 @@ st.sidebar.markdown("### 📥 Downloads de Arquivos")
 def botao_download(nome_arquivo, label):
     if os.path.exists(nome_arquivo):
         with open(nome_arquivo, "rb") as f:
-            st.sidebar.download_button(
-                label=label,
-                data=f,
-                file_name=nome_arquivo,
-                mime="text/csv"
-            )
+            st.sidebar.download_button(label=label, data=f, file_name=nome_arquivo, mime="text/csv")
     else:
         st.sidebar.caption(f"{nome_arquivo} não encontrado.")
 
@@ -214,15 +154,10 @@ botao_download(ARQUIVO_PRODUCAO, "📥 Baixar Produção (CSV)")
 # ==========================================
 if st.session_state["pagina"] == "Início":
     st.markdown("<br><br>", unsafe_allow_html=True)
-    
     col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
     with col_l2:
-        if os.path.exists("logo.png"):
-            st.image("logo.png", use_container_width=True)
-        else:
-            st.markdown("<h1 style='text-align: center;'>🖨️ GESTÃO EITA</h1>", unsafe_allow_html=True)
-            st.caption("<p style='text-align: center;'>Baden-Württemberg - Alemanha</p>", unsafe_allow_html=True)
-        
+        st.markdown("<h1 style='text-align: center;'>🖨️ GESTÃO EITA</h1>", unsafe_allow_html=True)
+        st.caption("<p style='text-align: center;'>Baden-Württemberg - Alemanha</p>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<h4 style='text-align: center;'>Escolha uma opção abaixo:</h4>", unsafe_allow_html=True)
         
@@ -295,11 +230,9 @@ elif st.session_state["pagina"] == "Catálogo":
         codigo_automatico = f"{prefixo}-{proximo_num:03d}"
 
     col_cad1, col_cad2 = st.columns(2)
-    
     with col_cad1:
         nome_prod = st.text_input("Nome do Produto", value=produto_em_edicao.get("nome", ""), placeholder="Ex: Chaveiro Personalizado")
         st.text_input("Código Automático", value=codigo_automatico, disabled=True)
-        
         gramas_pla = st.number_input("Gramas de PLA utilizadas", min_value=0.0, value=float(produto_em_edicao.get("gramas_pla", 30.0)), step=1.0)
         horas_imp = st.number_input("Horas de Impressão", min_value=0.0, value=float(produto_em_edicao.get("horas_imp", 2.0)), step=0.5)
 
@@ -504,19 +437,16 @@ elif st.session_state["pagina"] == "Compras":
         
     with st.form("form_compra_detalhada"):
         col_c1, col_c2 = st.columns(2)
-        
         with col_c1:
             material = st.selectbox("Material", ["PLA", "Argolas", "NFC", "OUTROS"])
             data_compra = st.date_input("Data da Compra", value=date.today())
             variedade = st.text_input("Variedade (Cor / Modelo / Marca)", placeholder="Ex: Azul Seda, 12mm, NTAG216")
-            
         with col_c2:
             col_q1, col_q2 = st.columns(2)
             with col_q1:
                 qtd = st.number_input("Quantidade", min_value=0.01, value=1.0, step=1.0)
             with col_q2:
                 unidade_medida = st.selectbox("Unidade", ["KG", "Unidades", "Gramas", "Metros"])
-                
             valor_compra = st.number_input("Valor da Compra (€)", min_value=0.0, value=20.0, step=1.0)
             identificacao_nota = st.text_input("Identificação da Nota (NF / Fatura)", placeholder="Ex: NF-12345")
             

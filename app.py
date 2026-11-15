@@ -69,10 +69,8 @@ def carregar_catalogo():
                     h_imp = float(r.get("tempo", r.get("horas_imp", 0.0)))
                     p_calc = float(r.get("venda", r.get("producao", 0.0)))
                     
-                    # Recupera o caminho exato da imagem salvo no CSV
                     foto_path = str(r.get("imagem", r.get("foto", "")))
-                    if foto_path == "nan" or not foto_path:
-                        foto_path = ""
+                    if foto_path == "nan": foto_path = ""
 
                     lista_carregada.append({
                         "codigo": codigo,
@@ -294,8 +292,14 @@ elif st.session_state["pagina"] == "Catálogo":
                 ext = foto_upload.name.split(".")[-1]
                 nome_arquivo_img = f"{codigo_automatico}.{ext}"
                 caminho_foto = os.path.join(PASTA_IMAGENS, nome_arquivo_img)
-                with open(caminho_foto, "wb") as f:
-                    f.write(foto_upload.getbuffer())
+                
+                # Gravação física blindada do buffer da imagem
+                try:
+                    with open(caminho_foto, "wb") as f:
+                        f.write(foto_upload.getbuffer())
+                    st.success(f"Imagem salva com sucesso em: {caminho_foto}")
+                except Exception as img_err:
+                    st.error(f"Erro ao salvar a imagem fisicamente: {img_err}")
 
             desc_nfc_txt = desc_nfc if usa_nfc else "Não usa"
             desc_argola_txt = desc_argola if usa_argola else "Não usa"

@@ -6,12 +6,11 @@ from datetime import date
 # Configuração da Página
 st.set_page_config(page_title="Gestão EITA", page_icon="🖨️", layout="wide")
 
-# Caminhos absolutos dos arquivos e pastas para garantir persistência local correta
-DIRETORIO_BASE = os.path.abspath(os.path.dirname(__file__))
-PASTA_IMAGENS = os.path.join(DIRETORIO_BASE, "imagens")
-ARQUIVO_CATALOGO = os.path.join(DIRETORIO_BASE, "catalogo_produtos.csv")
-ARQUIVO_COMPRAS = os.path.join(DIRETORIO_BASE, "compras_insumos.csv")
-ARQUIVO_PRODUCAO = os.path.join(DIRETORIO_BASE, "producao_lotes.csv")
+# Caminhos dos arquivos
+PASTA_IMAGENS = "imagens"
+ARQUIVO_CATALOGO = "catalogo_produtos.csv"
+ARQUIVO_COMPRAS = "compras_insumos.csv"
+ARQUIVO_PRODUCAO = "producao_lotes.csv"
 
 os.makedirs(PASTA_IMAGENS, exist_ok=True)
 
@@ -56,43 +55,37 @@ def carregar_catalogo():
     if os.path.exists(ARQUIVO_CATALOGO):
         try:
             df_cat = pd.read_csv(ARQUIVO_CATALOGO)
-            df_cat.columns = [str(c).strip().lower() for c in df_cat.columns]
-            
-            for _, r in df_cat.iterrows():
-                cat_raw = str(r.get("categoria", "Decoração"))
-                cat_nome = normalizar_categoria(cat_raw)
-                
-                codigo = str(r.get("codigo", ""))
-                if not codigo or codigo == "nan" or "-" not in codigo:
-                    codigo = f"{obter_prefixo_categoria(cat_nome)}-001"
+            if not df_cat.empty:
+                df_cat.columns = [str(c).strip().lower() for c in df_cat.columns]
+                for _, r in df_cat.iterrows():
+                    cat_raw = str(r.get("categoria", "Decoração"))
+                    cat_nome = normalizar_categoria(cat_raw)
+                    
+                    codigo = str(r.get("codigo", ""))
+                    if not codigo or codigo == "nan" or "-" not in codigo:
+                        codigo = f"{obter_prefixo_categoria(cat_nome)}-001"
 
-                g_pla = float(r.get("material", r.get("gramas_pla", 0.0)))
-                h_imp = float(r.get("tempo", r.get("horas_imp", 0.0)))
-                p_calc = float(r.get("venda", r.get("producao", 0.0)))
-                
-                foto_path = str(r.get("imagem", r.get("foto", "")))
-                if foto_path == "nan" or not foto_path:
-                    foto_path = ""
-                else:
-                    # Se o caminho salvo for relativo, converte para absoluto correto
-                    if not os.path.isabs(foto_path):
-                        foto_path = os.path.join(DIRETORIO_BASE, foto_path)
+                    g_pla = float(r.get("material", r.get("gramas_pla", 0.0)))
+                    h_imp = float(r.get("tempo", r.get("horas_imp", 0.0)))
+                    p_calc = float(r.get("venda", r.get("producao", 0.0)))
+                    foto_path = str(r.get("imagem", r.get("foto", "")))
+                    if foto_path == "nan": foto_path = ""
 
-                lista_carregada.append({
-                    "codigo": codigo,
-                    "nome": str(r.get("nome", "Produto")),
-                    "categoria": cat_nome,
-                    "gramas_pla": g_pla,
-                    "horas_imp": h_imp,
-                    "extras": str(r.get("extras", "Nenhum")),
-                    "preco_calculado": p_calc,
-                    "foto": foto_path if os.path.exists(foto_path) else ""
-                })
+                    lista_carregada.append({
+                        "codigo": codigo,
+                        "nome": str(r.get("nome", "Produto")),
+                        "categoria": cat_nome,
+                        "gramas_pla": g_pla,
+                        "horas_imp": h_imp,
+                        "extras": str(r.get("extras", "Nenhum")),
+                        "preco_calculado": p_calc,
+                        "foto": foto_path
+                    })
         except Exception as e:
             st.error(f"Erro ao carregar catálogo: {e}")
     return lista_carregada
 
-if "catalogo" not in st.session_state or not st.session_state["catalogo"]:
+if "catalogo" not in st.session_state:
     st.session_state["catalogo"] = carregar_catalogo()
 
 if "compras" not in st.session_state:
@@ -107,16 +100,11 @@ if "producao" not in st.session_state:
         except: st.session_state["producao"] = []
     else: st.session_state["producao"] = []
 
-def salvar_dados_catalogo(dados):
+def salvar_catalogo_fisico():
     try:
         os.makedirs(PASTA_IMAGENS, exist_ok=True)
         dados_para_salvar = []
-        for p in dados:
-            foto_p = p.get("foto", "")
-            # Salva o caminho relativo limpo no CSV para evitar quebras entre ambientes
-            if foto_p and os.path.isabs(foto_p):
-                foto_p = os.path.relpath(foto_p, DIRETORIO_BASE)
-
+        for p in st.session_state["catalogo"]:
             dados_para_salvar.append({
                 "codigo": p.get("codigo"),
                 "nome": p.get("nome"),
@@ -127,15 +115,15 @@ def salvar_dados_catalogo(dados):
                 "margem": 100.0,
                 "venda": p.get("preco_calculado"),
                 "lucro": p.get("preco_calculado") / 2.0,
-                "imagem": foto_p,
+                "imagem": p.get("foto"),
                 "gastos_extras": 0.0
             })
         df = pd.DataFrame(dados_para_salvar)
         df.to_csv(ARQUIVO_CATALOGO, index=False)
     except Exception as e:
-        st.error(f"Erro crítico ao salvar o catálogo: {e}")
+        st.error(f"Erro ao salvar arquivo CSV: {e}")
 
-# Garante arquivos iniciais
+# Garante arquivos iniciais se não existirem
 for arquivo, colunas in [
     (ARQUIVO_CATALOGO, ["codigo", "nome", "categoria", "tempo", "material", "producao", "margem", "venda", "lucro", "imagem", "gastos_extras"]),
     (ARQUIVO_COMPRAS, ["material", "data_compra", "variedade", "quantidade", "unidade", "valor_compra", "identificacao_nota"]),
@@ -327,7 +315,8 @@ elif st.session_state["pagina"] == "Catálogo":
                 st.session_state["catalogo"].append(novo_item)
                 msg = f"Produto '{nome_prod}' cadastrado com sucesso no catálogo!"
 
-            salvar_dados_catalogo(st.session_state["catalogo"])
+            # Grava no disco imediatamente
+            salvar_catalogo_fisico()
             st.success(msg)
             st.rerun()
 
@@ -388,7 +377,7 @@ elif st.session_state["pagina"] == "Catálogo":
                         with col_b2:
                             if st.button("🗑️ Excluir", key=f"del_cat_{cat}_{i}"):
                                 st.session_state["catalogo"].remove(prod)
-                                salvar_dados_catalogo(st.session_state["catalogo"])
+                                salvar_catalogo_fisico()
                                 st.success("Produto removido!")
                                 st.rerun()
                         st.markdown("---")
@@ -536,7 +525,7 @@ elif st.session_state["pagina"] == "Produção":
             st.success("Produção registrada com sucesso!")
             st.rerun()
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_apply_html=True)
     if st.button("📋 Ver / Ocultar Histórico de Produção"):
         st.session_state["mostrar_tabela_producao"] = not st.session_state["mostrar_tabela_producao"]
 

@@ -69,8 +69,10 @@ def carregar_catalogo():
                     h_imp = float(r.get("tempo", r.get("horas_imp", 0.0)))
                     p_calc = float(r.get("venda", r.get("producao", 0.0)))
                     
+                    # Recupera o caminho exato da imagem salvo no CSV
                     foto_path = str(r.get("imagem", r.get("foto", "")))
-                    if foto_path == "nan": foto_path = ""
+                    if foto_path == "nan" or not foto_path:
+                        foto_path = ""
 
                     lista_carregada.append({
                         "codigo": codigo,
@@ -284,7 +286,7 @@ elif st.session_state["pagina"] == "Catálogo":
         if not nome_prod:
             st.error("Por favor, preencha o Nome do Produto.")
         else:
-            # Mantém a foto anterior se não carregar uma nova
+            # Mantém a foto anterior caso nenhuma nova seja enviada na edição
             caminho_foto = produto_em_edicao.get("foto", "")
             
             if foto_upload is not None:
@@ -365,7 +367,7 @@ elif st.session_state["pagina"] == "Catálogo":
                             st.markdown(f"• **Preço de Venda (100%):** **€ {preco_venda_atual:.2f}**")
                         with c2:
                             foto_p = str(prod.get("foto", ""))
-                            # Verifica se o caminho da imagem existe fisicamente para exibi-la
+                            # Exibe a imagem perfeitamente se o arquivo existir no disco
                             if foto_p and os.path.exists(foto_p):
                                 st.image(foto_p, use_container_width=True)
                             else:

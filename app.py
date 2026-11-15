@@ -1,17 +1,12 @@
 import streamlit as st
 import pandas as pd
 import os
-import base64
-import requests
 from datetime import date
 
 # Configuração da Página
 st.set_page_config(page_title="Gestão EITA", page_icon="🖨️", layout="wide")
 
-# Configurações do GitHub (Lidas de forma segura dos Secrets do Streamlit Cloud)
-GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
-GITHUB_REPO = st.secrets.get("GITHUB_REPO", "") # Ex: "usuario/eita"
-
+# Caminhos dos arquivos e pastas locais
 PASTA_IMAGENS = "imagens"
 ARQUIVO_CATALOGO = "catalogo_produtos.csv"
 ARQUIVO_COMPRAS = "compras_insumos.csv"
@@ -39,33 +34,6 @@ def normalizar_categoria(cat_str):
     elif any(k in c for k in ["natal", "bola", "pinheiro", "noel", "vela"]): return "Natal"
     elif any(k in c for k in ["laç", "lac", "laco", "chaveiro", "cha"]): return "Laços"
     return "Decoração"
-
-# Função para enviar arquivos diretamente para o GitHub via API
-def salvar_no_github(caminho_arquivo, conteudo_bytes, mensagem_commit):
-    if not GITHUB_TOKEN or not GITHUB_REPO:
-        return False # Se não houver token configurado, opera apenas localmente
-    
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{caminho_arquivo}"
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json"
-    }
-    
-    # Verifica se o arquivo já existe para pegar o SHA atual (exigido pelo GitHub para atualizações)
-    r = requests.get(url, headers=headers)
-    sha = r.json().get("sha") if r.status_code == 200 else None
-    
-    encoded_content = base64.b64encode(conteudo_bytes).decode("utf-8")
-    
-    data = {
-        "message": mensagem_commit,
-        "content": encoded_content
-    }
-    if sha:
-        data["sha"] = sha
-        
-    put_r = requests.put(url, headers=headers, json=data)
-    return put_r.status_code in [200, 201]
 
 # ==========================================
 # GERENCIAMENTO DE ESTADO E CARREGAMENTO
@@ -153,13 +121,8 @@ def salvar_catalogo_fisico():
             })
         df = pd.DataFrame(dados_para_salvar)
         df.to_csv(ARQUIVO_CATALOGO, index=False)
-        
-        # Envia o CSV atualizado diretamente para o GitHub
-        with open(ARQUIVO_CATALOGO, "rb") as f:
-            salvar_no_github(ARQUIVO_CATALOGO, f.read(), "Atualização automática do catálogo_produtos.csv")
-            
     except Exception as e:
-        st.error(f"Erro ao salvar arquivo: {e}")
+        st.error(f"Erro ao salvar arquivo CSV: {e}")
 
 # Garante arquivos iniciais se não existirem
 for arquivo, colunas in [
@@ -329,18 +292,11 @@ elif st.session_state["pagina"] == "Catálogo":
                 nome_arquivo_img = f"{codigo_automatico}.{ext}"
                 caminho_foto = os.path.join(PASTA_IMAGENS, nome_arquivo_img)
                 
-                # Salva local e envia para o GitHub
                 try:
-                    bytes_foto = foto_upload.getbuffer()
                     with open(caminho_foto, "wb") as f:
-                        f.write(bytes_foto)
-                    
-                    # Envia direto para a pasta imagens/ no GitHub
-                    caminho_git_img = f"{PASTA_IMAGENS}/{nome_arquivo_img}"
-                    salvar_no_github(caminho_git_img, bytes_foto, f"Adicionando imagem {nome_arquivo_img}")
-                    st.success(f"Imagem enviada e salva no GitHub com sucesso!")
+                        f.write(foto_upload.getbuffer())
                 except Exception as img_err:
-                    st.error(f"Erro ao salvar imagem: {img_err}")
+                    st.error(f"Erro ao salvar a imagem: {img_err}")
 
             desc_nfc_txt = desc_nfc if usa_nfc else "Não usa"
             desc_argola_txt = desc_argola if usa_argola else "Não usa"
@@ -499,11 +455,8 @@ elif st.session_state["pagina"] == "Compras":
                 "identificacao_nota": identificacao_nota
             }
             st.session_state["compras"].append(nova_compra)
-            df_comp = pd.DataFrame(st.session_state["compras"])
-            df_comp.to_csv(ARQUIVO_COMPRAS, index=False)
-            with open(ARQUIVO_COMPRAS, "rb") as f:
-                salvar_no_github(ARQUIVO_COMPRAS, f.read(), "Atualização de compras_insumos.csv")
-            st.success("Compra cadastrada e salva no GitHub com sucesso!")
+            pd.DataFrame(st.session_state["compras"]).to_csv(ARQUIVO_COMPRAS, index=False)
+            st.success("Compra cadastrada com sucesso!")
             st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -518,10 +471,7 @@ elif st.session_state["pagina"] == "Compras":
             st.dataframe(pd.DataFrame(st.session_state["compras"]), use_container_width=True)
             if st.button("🗑️ Apagar Última Compra"):
                 st.session_state["compras"].pop()
-                df_comp = pd.DataFrame(st.session_state["compras"])
-                df_comp.to_csv(ARQUIVO_COMPRAS, index=False)
-                with open(ARQUIVO_COMPRAS, "rb") as f:
-                    salvar_no_github(ARQUIVO_COMPRAS, f.read(), "Remoção de compra")
+                pd.DataFrame(st.session_state["compras"]).to_csv(ARQUIVO_COMPRAS, index=False)
                 st.success("Removido!")
                 st.rerun()
 
@@ -576,11 +526,8 @@ elif st.session_state["pagina"] == "Produção":
                 "valor_total_lote": round(preco_unit * quantidade_lote, 2)
             }
             st.session_state["producao"].append(nova_prod)
-            df_prod = pd.DataFrame(st.session_state["producao"])
-            df_prod.to_csv(ARQUIVO_PRODUCAO, index=False)
-            with open(ARQUIVO_PRODUCAO, "rb") as f:
-                salvar_no_github(ARQUIVO_PRODUCAO, f.read(), "Atualização de producao_lotes.csv")
-            st.success("Produção registrada e salva no GitHub com sucesso!")
+            pd.DataFrame(st.session_state["producao"]).to_csv(ARQUIVO_PRODUCAO, index=False)
+            st.success("Produção registrada com sucesso!")
             st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -595,9 +542,6 @@ elif st.session_state["pagina"] == "Produção":
             st.dataframe(pd.DataFrame(st.session_state["producao"]), use_container_width=True)
             if st.button("🗑️ Apagar Último Registro"):
                 st.session_state["producao"].pop()
-                df_prod = pd.DataFrame(st.session_state["producao"])
-                df_prod.to_csv(ARQUIVO_PRODUCAO, index=False)
-                with open(ARQUIVO_PRODUCAO, "rb") as f:
-                    salvar_no_github(ARQUIVO_PRODUCAO, f.read(), "Remoção de lote")
+                pd.DataFrame(st.session_state["producao"]).to_csv(ARQUIVO_PRODUCAO, index=False)
                 st.success("Removido!")
                 st.rerun()
